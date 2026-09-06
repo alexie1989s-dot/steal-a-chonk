@@ -1,0 +1,13 @@
+# local session memory and editor state
+.claude/
+# pipeline intermediates and rejected experiments
+assets/chonks/*/work/
+assets/_archive_tests/
+*.blend1
+__pycache__/
+# never commit secrets
+.env
+.env.*
+*.key
+# FBX exports embed absolute machine paths; regenerate from the .blend via finish_chonk.py
+assets/chonks/**/*.fbx

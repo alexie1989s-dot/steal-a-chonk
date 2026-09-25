@@ -1,6 +1,12 @@
 # Steal a Chonk: project context
 
-Onboarded 2026-09-06; current asset update 2026-09-07; vertical-slice prototype 2026-09-24. This is a source-based project summary, not a new game design proposal.
+Onboarded 2026-09-06; current asset update 2026-09-07; vertical-slice prototype 2026-09-24; art paused for the prototype 2026-09-25. This is a source-based project summary, not a new game design proposal.
+
+## Art paused during the prototype (2026-09-25)
+
+The user directed that Blender work be set aside for now: the prototype is the priority, built and tested in Roblox Studio with what Studio offers. Placeholder visuals use Studio's built-in parts and materials. No Chonk art work happens until the user resumes the art track. This supersedes, for now, the Meshy direction and the 2026-09-07 Blender retry described below; both are history. Meshy is on hold, not installed. The user describes the Blender corgi work as an experiment. It stays untracked and set aside (see `AGENTS.md`).
+
+On 2026-09-25 Claude Code misread this direction and generated three corgi test meshes with Studio's AI tools. They were removed from the place and are not used anywhere. The generations remain in the user's Roblox inventory as "Roblox Generated Object" models. The acceptance gate is unchanged: nothing generated is accepted art.
 
 ## Vertical-slice prototype: 2026-09-24
 
@@ -27,7 +33,7 @@ On 2026-09-24 the user decided to build the spec §23 vertical slice as a Roblox
   - A guardian heading home after a chase moves at 12 studs/s.
 - Unchanged: the spec's open questions and the design inconsistencies listed at the end of this file. The slice avoided them, because rebirth, Showcase, streak/referral rewards and broadcasts are all out of slice scope.
 
-## Current Blender retry: 2026-09-07
+## Blender retry: 2026-09-07 (set aside 2026-09-25)
 
 After onboarding, the user explicitly asked to run Blender with its MCP server and redesign the rejected corgi, then asked to continue trying. This is a scoped exception to the historical stop/Meshy direction below. No permanent pipeline change or art acceptance has been recorded.
 
@@ -91,6 +97,8 @@ Spec section 20 calls for Rokit, Rojo, Luau LSP, Selene, StyLua and Wally. Rojo 
 Spec sections 23-24 stage the work: vertical slice (one zone, one guardian, ten Chonks, Vault, wheel, carry/bat, reveal, two testers); Alpha (Showcase, shields, revenge systems, rebirth, Zone 2, 25 Chonks); Beta (Zone 3, all guardians, events, store, 40 Chonks, leaderboards); launch and weekly drops. Collection sets/Wanted Board, trading with escrow, more zones and localization are later work.
 
 ## Recorded art direction and quality gate
+
+Superseded on 2026-09-25 by the Studio-only direction at the top of this file; kept as history.
 
 The partner supplies concept sheets. At onboarding, the recorded direction was Meshy image-to-3D for hero Chonks; primitive hero modeling and the repeated Blender texture-projection fixes were rejected. The saved next experiment was a textured corgi from multiple views, with no auto-split initially, then remeshing if needed and a visible result for the partner. The explicit Blender retry at the top of this file is the current scoped work. Tripo was retained as a secondary possibility for props/guardians, not an active integration.
 

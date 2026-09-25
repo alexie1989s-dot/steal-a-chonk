@@ -12,8 +12,9 @@ These instructions are shared by Codex and Claude Code. Follow the current user 
 ## Decisions to preserve
 
 - This is **Steal a Chonk**, an original, mobile-first Roblox game about ultra-round animals, field acquisition, Zoomies, a safe Vault, and an opt-in raidable Showcase. Humor is affectionate.
-- The recorded hero-art direction is **Meshy image-to-3D from the partner's concepts**. Primitive hero models were rejected, and the user stopped the Blender markings/fur finishing approach. Do not resume that approach unless the user asks.
-- **Current scoped exception, 2026-09-07:** the user explicitly requested another corgi redesign using Blender and its MCP server. That attempt is saved under `assets/chonks/corgi/codex_redesign/`; it awaits visual review and Studio validation. This request authorizes the Blender retry without establishing a permanent pipeline change or art acceptance.
+- **Art is paused during the prototype (user, 2026-09-25).** Work on prototype construction and tests in Roblox Studio, with Studio's built-in parts and materials as placeholders. No Blender or other external-tool assets and no Chonk art work (including Studio's AI mesh generation) until the user resumes the art track. Meshy is on hold.
+- The Blender corgi redesign (`assets/chonks/corgi/codex_redesign/` and its `assets/tools/` helpers) is a set-aside experiment. It stays untracked; do not commit or build on it unless the user asks. Its `.blend` files and renders embed the absolute machine path, so sanitize them before any commit.
+- History: Meshy image-to-3D was the recorded direction before 2026-09-25, and the user stopped the Blender markings/fur finishing approach on 2026-09-06. `codex/PROJECT_CONTEXT.md` keeps the details.
 - The existing corgi model is a rejected prototype. A file in Git is not evidence of partner acceptance. Preserve the original concepts and prototype outputs.
 - The saved art milestone is one partner-accepted corgi, then a second Chonk to prove repeatability. On 2026-09-24 the user started the spec §23 vertical-slice prototype ahead of art acceptance, so the two tracks now run in parallel. The current request determines which work to carry out.
 - Use the developers' confirmed play experience for reference-game mechanics. Do not replace it with assumptions or fan-wiki claims. Distinguish proposed mechanics from observed mechanics.
@@ -32,6 +33,7 @@ These instructions are shared by Codex and Claude Code. Follow the current user 
 - Never add a `Co-Authored-By` commit trailer. Preserve the repository's noreply author identity.
 - Before every commit and every push, scan tracked text and files being added for secrets, tokens, environment/key files, and machine paths containing personal usernames; report the result. Do not print secret values.
 - Keep credentials out of the repository. Preserve `.gitignore` exclusions for `.claude/`, intermediate work, FBX exports, and secrets. FBX files were excluded because they embed machine paths.
+- **Every branch on GitHub, `main` included, has a clean root `README.md` for the partner developers (user, 2026-09-25):** what the game is, what the branch holds and how far it got, how to run it, what testers should check, and what comes next. Write it for people, in plain words, and keep detailed evidence in `codex/HANDOFF.md`. Update it in the same push as the work it describes.
 
 ## Handoff maintenance
 

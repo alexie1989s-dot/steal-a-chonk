@@ -4,6 +4,7 @@ Created 2026-09-06 during Codex onboarding at the user's request. This is Codex'
 
 | File | Purpose |
 | --- | --- |
+| [../README.md](../README.md) | The branch's front page for the developers: status, how to run it, what to test, what's next. Every branch on GitHub has one; update it with each push. |
 | [HANDOFF.md](HANDOFF.md) | Current checkpoint, work completed, verification limits, and next milestone. Read first on resume. |
 | [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) | Project understanding, durable decisions, source map, existing assets and tools, unresolved design details. |
 | [../AGENTS.md](../AGENTS.md) | Shared working instructions for either assistant. |

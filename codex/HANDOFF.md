@@ -1,6 +1,19 @@
 # Current handoff
 
-Updated: 2026-09-24 by Claude Code. It built the vertical-slice greybox prototype. The art notes further down come from Codex (2026-09-07) and still apply.
+Updated: 2026-09-25 by Claude Code. The vertical-slice greybox prototype was built on 2026-09-24. The Codex art notes further down (2026-09-07) are history: art is paused during the prototype.
+
+## 2026-09-25 (Claude Code)
+
+- **Direction:** the user set art aside for the prototype. The work is prototype construction and tests in Studio, with built-in parts as placeholders. The Blender corgi set stays untracked and was not sanitized or committed. See `AGENTS.md` and `PROJECT_CONTEXT.md`.
+- A mistaken Studio AI corgi trial was made and then removed from the place; see `PROJECT_CONTEXT.md`. The open place is back to Baseplate, SpawnLocation and Terrain.
+- **Verified today:**
+  - `lune run tests/run`: 56 passed.
+  - Rojo serve was up.
+  - Studio playtest smoke test through DevHooks: grab nest 1 → deposit → unwrap → Vault display model → income at 7.5/s for an Uncommon of size factor 1.5. The console showed only the two boot lines.
+- **DevHooks note:** `setTimeScale` multiplies durations. Use 0.05 for 20× faster timers; 20 makes them 20× slower.
+- **Next build (chosen by the user):** the Showcase heist, Alpha step 1. The plan is [2026-09-25-showcase-heist.md](../docs/superpowers/plans/2026-09-25-showcase-heist.md), with a proposals table for the devs. It was written but not yet executed, pending the user's review.
+- **READMEs (user rule):** every branch on GitHub, `main` included, carries a root `README.md` written for the partner devs; the rule is in `AGENTS.md`. Added to `main` and to this branch and pushed. Both branches add the file, so merging this branch into `main` conflicts on `README.md`: keep this branch's version and refresh its Branches table.
+- **Fresh-clone fix:** `rojo build` fails when `build/` doesn't exist (it is ignored, so a clone lacks it). The run steps below now create it first.
 
 ## Vertical-slice prototype (2026-09-24, Claude Code)
 
@@ -51,7 +64,7 @@ What a player can do:
 **How to run it:**
 1. Run `rokit install`.
 2. Start `rojo serve default.project.json` from the repo root.
-3. Open any place, or `rojo build default.project.json -o build/prototype.rbxl` and open that.
+3. Open any place, or run `mkdir build` then `rojo build default.project.json -o build/prototype.rbxl` and open that.
 4. Plugins → Rojo → Connect.
 5. Press Play.
 

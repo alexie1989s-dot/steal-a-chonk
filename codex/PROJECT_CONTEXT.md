@@ -1,6 +1,6 @@
 # Steal a Chonk: project context
 
-Onboarded 2026-09-06; current asset update 2026-09-07; vertical-slice prototype 2026-09-24; art paused for the prototype 2026-09-25. This is a source-based project summary, not a new game design proposal.
+Onboarded 2026-09-06; current asset update 2026-09-07; vertical-slice prototype 2026-09-24; art paused for the prototype 2026-09-25; repository public on GitHub since 2026-09-25. This is a source-based project summary, not a new game design proposal.
 
 ## Art paused during the prototype (2026-09-25)
 

@@ -31,7 +31,8 @@ These instructions are shared by Codex and Claude Code. Follow the current user 
 ## Repository hygiene
 
 - Never add a `Co-Authored-By` commit trailer. Preserve the repository's noreply author identity.
-- Before every commit and every push, scan tracked text and files being added for secrets, tokens, environment/key files, and machine paths containing personal usernames; report the result. Do not print secret values.
+- **The GitHub repository is public (user, 2026-09-25).** Anything pushed to any branch is visible to everyone, and a force-push does not take it back: GitHub keeps old commits reachable by SHA.
+- Before every commit and every push, scan tracked text and files being added for secrets, tokens, environment/key files, and machine paths containing personal usernames; report the result. Do not print secret values. Binary files hide paths too: read PNG text chunks, and decompress zstd-compressed `.blend` files before searching them.
 - Keep credentials out of the repository. Preserve `.gitignore` exclusions for `.claude/`, intermediate work, FBX exports, and secrets. FBX files were excluded because they embed machine paths.
 - **Every branch on GitHub, `main` included, has a clean root `README.md` for the partner developers (user, 2026-09-25):** what the game is, what the branch holds and how far it got, how to run it, what testers should check, and what comes next. Write it for people, in plain words, and keep detailed evidence in `codex/HANDOFF.md`. Update it in the same push as the work it describes.
 

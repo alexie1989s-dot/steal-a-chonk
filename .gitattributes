@@ -1,0 +1,7 @@
+# StyLua is configured with line_endings = "Unix" (see stylua.toml), but Git on Windows
+# defaults to core.autocrlf=true and hands out CRLF working copies. Without this file a
+# fresh Windows clone fails `stylua --check` on every single file, with a diff that shows
+# identical text on both sides. Pinning the sources to LF in the working tree avoids it.
+*.luau text eol=lf
+*.toml text eol=lf
+*.json text eol=lf

@@ -1,5 +1,7 @@
 # local session memory and editor state
 .claude/
+# local scratch for the shared Codex/Claude working directory
+codex/scratch/
 # pipeline intermediates and rejected experiments
 assets/chonks/*/work/
 assets/_archive_tests/
@@ -11,3 +13,11 @@ __pycache__/
 *.key
 # FBX exports embed absolute machine paths; regenerate from the .blend via finish_chonk.py
 assets/chonks/**/*.fbx
+# Roblox build outputs, Studio lock files, generated sourcemap and Wally packages
+build/
+*.rbxl.lock
+*.rbxlx.lock
+sourcemap.json
+Packages/
+ServerPackages/
+DevPackages/

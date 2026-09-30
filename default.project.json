@@ -1,0 +1,130 @@
+{
+	"name": "steal-a-chonk",
+	"tree": {
+		"$className": "DataModel",
+		"ReplicatedStorage": {
+			"Shared": {
+				"$path": "src/shared"
+			}
+		},
+		"ServerScriptService": {
+			"Server": {
+				"$path": "src/server"
+			}
+		},
+		"StarterPlayer": {
+			"StarterPlayerScripts": {
+				"Client": {
+					"$path": "src/client"
+				}
+			}
+		},
+		"Lighting": {
+			"$properties": {
+				"Technology": "ShadowMap",
+				"GlobalShadows": true,
+				"ShadowSoftness": 0.4,
+				"Brightness": 2.8,
+				"ClockTime": 15,
+				"GeographicLatitude": 20,
+				"ExposureCompensation": 0.2,
+				"EnvironmentDiffuseScale": 0.65,
+				"EnvironmentSpecularScale": 0.45,
+				"Ambient": [0.26, 0.27, 0.33],
+				"OutdoorAmbient": [0.44, 0.47, 0.55],
+				"ColorShift_Top": [0.11, 0.07, 0.02],
+				"ColorShift_Bottom": [0.03, 0.05, 0.09]
+			},
+			"Atmosphere": {
+				"$className": "Atmosphere",
+				"$properties": {
+					"Density": 0.32,
+					"Offset": 0.15,
+					"Color": [0.78, 0.82, 0.87],
+					"Decay": [0.42, 0.45, 0.51],
+					"Glare": 0.35,
+					"Haze": 1.4
+				}
+			},
+			"Sky": {
+				"$className": "Sky",
+				"$properties": {
+					"SunAngularSize": 14,
+					"MoonAngularSize": 9,
+					"StarCount": 0
+				}
+			},
+			"Bloom": {
+				"$className": "BloomEffect",
+				"$properties": {
+					"Intensity": 0.55,
+					"Size": 22,
+					"Threshold": 1.5
+				}
+			},
+			"ColorCorrection": {
+				"$className": "ColorCorrectionEffect",
+				"$properties": {
+					"Brightness": 0.02,
+					"Contrast": 0.14,
+					"Saturation": 0.22,
+					"TintColor": [1, 0.99, 0.96]
+				}
+			},
+			"SunRays": {
+				"$className": "SunRaysEffect",
+				"$properties": {
+					"Intensity": 0.06,
+					"Spread": 0.6
+				}
+			},
+			"DepthOfField": {
+				"$className": "DepthOfFieldEffect",
+				"$properties": {
+					"FarIntensity": 0.1,
+					"FocusDistance": 60,
+					"InFocusRadius": 140,
+					"NearIntensity": 0
+				}
+			}
+		},
+		"SoundService": {
+			"$properties": {
+				"AmbientReverb": "Plain",
+				"DistanceFactor": 12,
+				"RolloffScale": 0.7
+			}
+		},
+		"Workspace": {
+			"Baseplate": {
+				"$className": "Part",
+				"$properties": {
+					"Anchored": true,
+					"Locked": true,
+					"Size": [2400, 20, 2400],
+					"CFrame": {
+						"CFrame": {
+							"position": [0, -10, 0],
+							"orientation": [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+						}
+					},
+					"Material": "LeafyGrass",
+					"Color": [0.35, 0.55, 0.28]
+				}
+			},
+			"SpawnLocation": {
+				"$className": "SpawnLocation",
+				"$properties": {
+					"Anchored": true,
+					"Size": [8, 1, 8],
+					"CFrame": {
+						"CFrame": {
+							"position": [0, 0.5, 0],
+							"orientation": [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+						}
+					}
+				}
+			}
+		}
+	}
+}

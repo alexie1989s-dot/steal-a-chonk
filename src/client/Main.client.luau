@@ -8,5 +8,7 @@ require(Client.CameraFx).start()
 require(Client.Effects).start()
 require(Client.Reveal).start()
 require(Client.Input).start()
+require(Client.PromptFilter).start()
+require(Client.Idle).start()
 
 print(`[{Version.name}] client booted ({Version.stage})`)

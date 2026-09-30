@@ -1,39 +1,58 @@
--- Carrying a burrito home (spec §5, §7, §11). The server decides every pickup, drop and hand-off.
--- A dropped burrito lies where it fell and anyone may pick it up, the dropper included.
+-- Carrying items home (spec §5, §7, §11). The server decides every pickup, drop and hand-off.
+-- Every physical item is registered here, a nest burrito or a Chonk, wherever it is.
+-- A dropped item lies where it fell and anyone may pick it up, the dropper included.
+local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Formulas = require(ReplicatedStorage.Shared.Formulas)
 local Layout = require(ReplicatedStorage.Shared.Layout)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local ShowcaseRules = require(ReplicatedStorage.Shared.ShowcaseRules)
 local Signal = require(ReplicatedStorage.Shared.Signal)
 local Strings = require(ReplicatedStorage.Shared.Strings)
 local Movement = require(script.Parent.Movement)
 local PlayerState = require(script.Parent.PlayerState)
 
-export type Burrito = {
+export type Item = {
 	id: number,
-	nest: number,
-	roll: { chonkId: string, tier: string, size: number },
+	kind: "burrito" | "chonk",
+	roll: { chonkId: string, tier: string, size: number }, -- chonks: the record's fields
 	model: Model,
-	status: "ready" | "carried" | "loose" | "incubating",
+	status: "ready" | "carried" | "loose" | "incubating" | "showcase",
 	carrier: Player?,
 	looseAt: number?,
+	nest: number?, -- nest burritos only
+	owner: Player?, -- last owner; nil for field burritos and the dummy Chonk
+	dummy: boolean?, -- the dummy house's Chonk until someone keeps it
+	uid: number?, -- chonks: record uid in the owner's sequence
+	progress: number?, -- burritos: unwrap fraction already done, 0..1
 }
+export type Burrito = Item
 
 local Carry = {
-	PickedUp = Signal.new(), -- (player, burrito)
-	Dropped = Signal.new(), -- (burrito, player, reason)
-	CrossedHome = Signal.new(), -- (player, burrito)
+	PickedUp = Signal.new(), -- (player, item)
+	Dropped = Signal.new(), -- (item, player, reason)
+	CrossedHome = Signal.new(), -- (player, item)
 }
 
 local CARRY_WELD = "CarryWeld"
+
+local items: { [number]: Item } = {}
+local nextId = 1
 
 local function rootOf(player: Player): BasePart?
 	local character = player.Character
 	return character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
 end
 Carry.rootOf = rootOf
+
+local function toast(player: Player, key: string)
+	local text = Strings.Toasts[key]
+	if text then
+		Remotes.get("Toast"):FireClient(player, text)
+	end
+end
 
 local function setPhysics(model: Model, anchored: boolean)
 	for _, part in model:GetDescendants() do
@@ -45,32 +64,133 @@ local function setPhysics(model: Model, anchored: boolean)
 	end
 end
 
-local function detach(burrito: Burrito)
-	local body = burrito.model.PrimaryPart
+local function detach(item: Item)
+	local body = item.model.PrimaryPart
 	local weld = body and body:FindFirstChild(CARRY_WELD)
 	if weld then
 		weld:Destroy()
 	end
-	setPhysics(burrito.model, true)
+	setPhysics(item.model, true)
 end
 
--- Rests a burrito on the ground at (x, z).
-function Carry.placeOnGround(burrito: Burrito, x: number, z: number)
-	local height = 0.5 + 1.1 * Formulas.sizeScale(burrito.roll.size)
-	burrito.model:PivotTo(CFrame.new(x, height, z))
+local function grabPrompt(item: Item): ProximityPrompt?
+	local body = item.model.PrimaryPart
+	return body and body:FindFirstChild("GrabPrompt") :: ProximityPrompt?
 end
 
-function Carry.pickUp(player: Player, burrito: Burrito): (boolean, string?)
+-- The only way to change an item's status. The GrabPrompt is live only while the item lies free.
+function Carry.setStatus(item: Item, status: string)
+	item.status = status :: any
+	local prompt = grabPrompt(item)
+	if prompt then
+		prompt.Enabled = status == "ready" or status == "loose"
+	end
+	-- Only a seated Chonk idles. Anything the server is about to move -- carried, loose, back in
+	-- an incubator -- loses the tag first, so the client stops holding it to a remembered pose.
+	local idling = status == "showcase" and item.kind == "chonk"
+	if idling ~= CollectionService:HasTag(item.model, Config.Tags.chonkIdle) then
+		if idling then
+			CollectionService:AddTag(item.model, Config.Tags.chonkIdle)
+		else
+			CollectionService:RemoveTag(item.model, Config.Tags.chonkIdle)
+		end
+	end
+end
+
+-- Assigns an id and adds the GrabPrompt. The caller positions and parents the model.
+function Carry.register(fields: { [string]: any }): Item
+	local item = fields :: Item
+	item.id = nextId
+	nextId += 1
+	item.model.Name = if item.kind == "burrito" then `Burrito{item.id}` else `ChonkItem{item.id}`
+	item.model:SetAttribute("ItemId", item.id)
+
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.Name = "GrabPrompt"
+	prompt.ActionText = Strings.Prompts.grab
+	prompt.ObjectText = if item.kind == "burrito" then Strings.Prompts.grabObject else Strings.Prompts.chonkObject
+	prompt.HoldDuration = 0
+	prompt.MaxActivationDistance = Config.Nest.grabDistance
+	prompt.RequiresLineOfSight = false
+	prompt.Parent = item.model.PrimaryPart
+	prompt.Triggered:Connect(function(player: Player)
+		Carry.grab(player, item)
+	end)
+
+	items[item.id] = item
+	Carry.setStatus(item, item.status)
+	return item
+end
+
+-- The Grab prompt's path, shared with DevHooks. Porch items leave only through the Steal prompt, so this
+-- takes free items only.
+function Carry.grab(player: Player, item: Item): (boolean, string?)
+	local ok, reason = false, "taken"
+	if item.status == "ready" or item.status == "loose" then
+		ok, reason = Carry.pickUp(player, item)
+	end
+	if not ok and reason then
+		toast(player, reason)
+	end
+	return ok, reason
+end
+
+-- Removes an item from the registry and destroys its model. A carried item is taken from its carrier first.
+function Carry.forget(item: Item)
+	if item.carrier then
+		local state = PlayerState.get(item.carrier)
+		if state and state.carrying == item then
+			Carry.take(item.carrier)
+		end
+	end
+	items[item.id] = nil
+	item.model:Destroy()
+end
+
+function Carry.items(): { [number]: Item }
+	return items
+end
+
+-- Makes `player` the item's owner after a deposit: a Chonk from someone else gets a uid in the new owner's
+-- sequence, and a kept dummy Chonk uses up the player's one practice Chonk.
+function Carry.adopt(player: Player, item: Item)
+	local state = PlayerState.get(player)
+	if not state then
+		return
+	end
+	if item.kind == "chonk" and (item.owner ~= player or not item.uid) then
+		item.uid = state.nextUid
+		state.nextUid += 1
+	end
+	if item.dummy then
+		item.dummy = nil
+		state.dummyTaken = true
+	end
+	item.owner = player
+end
+
+-- Rests an item on the ground at (x, z).
+function Carry.placeOnGround(item: Item, x: number, z: number)
+	local height = 0.5 + 1.1 * Formulas.sizeScale(item.roll.size)
+	item.model:PivotTo(CFrame.new(x, height, z))
+end
+
+function Carry.pickUp(player: Player, item: Item): (boolean, string?)
 	local state = PlayerState.get(player)
 	if not state then
 		return false, "noState"
 	end
 	-- Status first: the check and the claim below never yield, so two simultaneous grabs cannot both win.
-	if burrito.status ~= "ready" and burrito.status ~= "loose" then
+	if item.status ~= "ready" and item.status ~= "loose" and item.status ~= "showcase" then
 		return false, "taken"
 	end
 	if state.carrying then
 		return false, "alreadyCarrying"
+	end
+	-- A practice Chonk that could never be deposited would leave the player stuck at carry speed.
+	local keep, keepReason = ShowcaseRules.canKeep(item.dummy, state.dummyTaken)
+	if not keep then
+		return false, keepReason
 	end
 	local root = rootOf(player)
 	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
@@ -78,7 +198,7 @@ function Carry.pickUp(player: Player, burrito: Burrito): (boolean, string?)
 		return false, "noCharacter"
 	end
 	-- Prompts are triggered by the client, so the server re-checks reach (spec §20).
-	local at = burrito.model:GetPivot().Position
+	local at = item.model:GetPivot().Position
 	if
 		Layout.planarDistance(root.Position.X, root.Position.Z, at.X, at.Z)
 		> Config.Nest.grabDistance + Config.AntiCheat.reachTolerance
@@ -86,13 +206,15 @@ function Carry.pickUp(player: Player, burrito: Burrito): (boolean, string?)
 		return false, "tooFar"
 	end
 
-	burrito.status = "carried"
-	burrito.carrier = player
-	burrito.looseAt = nil
-	state.carrying = burrito
+	Carry.setStatus(item, "carried")
+	item.carrier = player
+	item.looseAt = nil
+	state.carrying = item
 
-	local model = burrito.model
-	model:PivotTo(root.CFrame * CFrame.new(0, 3.6, 0))
+	local model = item.model
+	-- Above the head, higher for big Chonks so they never sit inside the carrier.
+	local lift = math.max(3.6, 1.5 + model:GetExtentsSize().Y / 2)
+	model:PivotTo(root.CFrame * CFrame.new(0, lift, 0))
 	setPhysics(model, false)
 	local weld = Instance.new("WeldConstraint")
 	weld.Name = CARRY_WELD
@@ -102,45 +224,45 @@ function Carry.pickUp(player: Player, burrito: Burrito): (boolean, string?)
 
 	Movement.refresh(player)
 	PlayerState.sync(player)
-	Carry.PickedUp:Fire(player, burrito)
+	Carry.PickedUp:Fire(player, item)
 	return true
 end
 
--- Drops the carried burrito at the carrier's feet. Returns it, or nil if nothing was carried.
-function Carry.drop(player: Player, reason: string): Burrito?
+-- Drops the carried item at the carrier's feet. Returns it, or nil if nothing was carried.
+function Carry.drop(player: Player, reason: string): Item?
 	local state = PlayerState.get(player)
-	local burrito = state and state.carrying
-	if not (state and burrito) then
+	local item = state and state.carrying
+	if not (state and item) then
 		return nil
 	end
 	local root = rootOf(player)
-	local position = if root then root.Position else burrito.model:GetPivot().Position
+	local position = if root then root.Position else item.model:GetPivot().Position
 	state.carrying = nil
-	detach(burrito)
-	Carry.placeOnGround(burrito, position.X, position.Z)
-	burrito.status = "loose"
-	burrito.carrier = nil
-	burrito.looseAt = os.clock()
+	detach(item)
+	Carry.placeOnGround(item, position.X, position.Z)
+	Carry.setStatus(item, "loose")
+	item.carrier = nil
+	item.looseAt = os.clock()
 
 	Movement.refresh(player)
 	PlayerState.sync(player)
-	Carry.Dropped:Fire(burrito, player, reason)
-	return burrito
+	Carry.Dropped:Fire(item, player, reason)
+	return item
 end
 
--- Removes the carried burrito from the player without dropping it (the Vault takes it).
-function Carry.take(player: Player): Burrito?
+-- Removes the carried item from the player without dropping it (the Vault or the porch takes it).
+function Carry.take(player: Player): Item?
 	local state = PlayerState.get(player)
-	local burrito = state and state.carrying
-	if not (state and burrito) then
+	local item = state and state.carrying
+	if not (state and item) then
 		return nil
 	end
 	state.carrying = nil
-	detach(burrito)
-	burrito.carrier = nil
+	detach(item)
+	item.carrier = nil
 	Movement.refresh(player)
 	PlayerState.sync(player)
-	return burrito
+	return item
 end
 
 function Carry.inField(player: Player): boolean

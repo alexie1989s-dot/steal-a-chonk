@@ -60,4 +60,23 @@ T.test("reveal card carries the naming grammar and the catalog bio", function()
 	T.expectNear(card.incomePerSecond, 5 * 4, 1e-9)
 end)
 
+T.test("stashing a Chonk needs room, not an incubator", function()
+	local function stash(o)
+		local c = { carrying = true, atOwnIncubator = true, vaultCount = 0, incubating = 2 }
+		for k, v in o or {} do
+			c[k] = v
+		end
+		return c
+	end
+	T.expectEqual(VaultRules.canStash(stash()), true)
+	T.expectEqual(select(2, VaultRules.canStash(stash({ carrying = false }))), "notCarrying")
+	T.expectEqual(select(2, VaultRules.canStash(stash({ atOwnIncubator = false }))), "notYourBase")
+	T.expectEqual(select(2, VaultRules.canStash(stash({ vaultCount = Config.Vault.displaySlots - 2 }))), "vaultFull")
+end)
+
+T.test("vault income ignores holes between pads", function()
+	local pads = { [1] = { tier = "Common", size = 1 }, [4] = { tier = "Common", size = 2 } }
+	T.expectNear(VaultRules.incomePerSecond(pads), 1 + 1.5, 1e-9)
+end)
+
 return {}

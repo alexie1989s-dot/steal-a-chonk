@@ -27,4 +27,10 @@ T.test("negative and non-finite values do not crash the HUD", function()
 	T.expectEqual(Format.number(0 / 0), "0")
 end)
 
+T.test("clock prints m:ss and rounds up", function()
+	T.expectEqual(Format.clock(0), "0:00")
+	T.expectEqual(Format.clock(61), "1:01")
+	T.expectEqual(Format.clock(119.2), "2:00")
+end)
+
 return {}

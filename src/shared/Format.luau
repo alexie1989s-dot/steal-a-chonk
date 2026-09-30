@@ -35,4 +35,10 @@ function Format.rate(n: number): string
 	return Format.number(n)
 end
 
+-- Countdowns as m:ss. Rounds up, so a live countdown never shows 0:00 while time remains.
+function Format.clock(seconds: number): string
+	local total = if seconds == seconds then math.max(math.ceil(seconds), 0) else 0
+	return string.format("%d:%02d", total // 60, total % 60)
+end
+
 return Format

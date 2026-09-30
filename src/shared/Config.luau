@@ -77,9 +77,29 @@ Config.Wheel = {
 }
 
 Config.Vault = {
+	labelDistance = 30, -- ten display pads sit close together; tags only read one or two at a time
 	incubators = 2, -- §10
 	displaySlots = 10, -- slice proposal
 	promptDistance = 8,
+}
+
+-- The porch Showcase (§10, §11). Heist proposals: docs/superpowers/plans/2026-09-25-showcase-heist.md.
+Config.Showcase = {
+	slots = 2, -- §10: starts at 2, grows to 8 by Legend stage (growth is a later plan)
+	unwrapFactor = 0.5, -- "faster unwrap" (§10); the number is a heist proposal
+	incomeMultiplier = 1.5, -- "+50 percent income" (§10)
+	placeDistance = 8,
+	stealHoldSeconds = 1.5, -- heist proposal
+	holdToleranceSeconds = 0.25, -- network jitter allowed when the server times a Steal hold
+	raidCooldownSeconds = 120, -- §11: two minutes of Showcase immunity
+	alarmSeconds = 6, -- heist proposal
+}
+
+-- The practice house near spawn (§11). Heist proposals.
+Config.DummyBase = {
+	x = 0,
+	z = 24,
+	respawnSeconds = 45,
 }
 
 Config.Carry = {
@@ -140,6 +160,11 @@ Config.Camera = {
 	baseFov = 70,
 	fovPerSpeed = 0.6,
 	maxExtraFov = 20,
+}
+
+-- CollectionService tags. The client watches these; the server is the only thing that sets them.
+Config.Tags = {
+	chonkIdle = "ChonkIdle",
 }
 
 -- Studio testing only: DevHooks can scale unwrap, respawn and loose-return timers.

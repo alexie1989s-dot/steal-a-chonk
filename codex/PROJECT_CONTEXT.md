@@ -1,12 +1,81 @@
 # Steal a Chonk: project context
 
-Onboarded 2026-09-06; current asset update 2026-09-07; vertical-slice prototype 2026-09-24; art paused for the prototype 2026-09-25; repository public on GitHub since 2026-09-25. This is a source-based project summary, not a new game design proposal.
+Onboarded 2026-09-06; current asset update 2026-09-07; vertical-slice prototype 2026-09-24; Showcase heist 2026-09-27; presentation pass 2026-09-29; art paused for the prototype 2026-09-25; repository public on GitHub since 2026-09-25. This is a source-based project summary, not a new game design proposal.
 
 ## Art paused during the prototype (2026-09-25)
 
 The user directed that Blender work be set aside for now: the prototype is the priority, built and tested in Roblox Studio with what Studio offers. Placeholder visuals use Studio's built-in parts and materials. No Chonk art work happens until the user resumes the art track. This supersedes, for now, the Meshy direction and the 2026-09-07 Blender retry described below; both are history. Meshy is on hold, not installed. The user describes the Blender corgi work as an experiment. It stays untracked and set aside (see `AGENTS.md`).
 
 On 2026-09-25 Claude Code misread this direction and generated three corgi test meshes with Studio's AI tools. They were removed from the place and are not used anywhere. The generations remain in the user's Roblox inventory as "Roblox Generated Object" models. The acceptance gate is unchanged: nothing generated is accepted art.
+
+## Presentation pass, part-craft only (2026-09-29)
+
+The user said the prototype looked "ugly and unfinished" and asked for it to feel close to a
+finished game, and asked whether better models were possible without Blender. Offered three
+scopes, the user chose **part-craft only**: models and scenery built from Studio's own primitives
+and materials, with **no Blender, no Meshy, no Studio AI generation and no Creator Store or other
+third-party assets**. This does not resume the art track. It is the 2026-09-25 "built-in parts and
+materials as placeholders" allowance, taken seriously rather than left at greybox.
+
+What this does and does not settle:
+
+- **Still placeholder.** Nothing here is accepted art. The art milestone is unchanged: one
+  partner-accepted Chonk, then a second to prove repeatability. A file in Git is not acceptance.
+- **The catalog's `species` field now drives shape**, not just flavour text. The ten slice Chonks
+  have distinct silhouettes. The names, bios and tier colours are still draft copy for partner
+  review.
+- **No rules changed.** The heist proposals listed below are still unruled, and the two-player
+  checklist in `HANDOFF.md` still stands as written.
+- **A geometry contract is now load-bearing** and is written at the top of `Models.luau`: a Chonk's
+  body Y extent is exactly `d = 4 * sizeScale(size)` and the model pivot is the body centre,
+  because Vault, Showcase and DummyBase all place Chonks with `pad.Y + d / 2` and hang name tags at
+  `d / 2 + 1.5`. Anything that changes body proportions must keep that.
+- **The house play area is deliberately left unroofed.** The Vault display pads sit inside the
+  house, and a roof over them fights the player camera. This is a decision, not an omission.
+- **Field scenery never collides.** All dressing is `CanCollide` and `CanQuery` false so it cannot
+  block a chase, a juke, or a prompt raycast (spec §11).
+
+**Open, needs a ruling: sound.** The prototype has no audio whatsoever, and it is now the largest
+remaining gap in how finished it feels. Audio cannot be part-crafted -- every route needs an
+uploaded asset id, which falls outside "part-craft only". Roblox's own official free SFX library is
+the obvious candidate, but using it is a third-party-asset decision the user has not been asked for.
+
+## Showcase heist (Alpha step 1): 2026-09-27
+
+Built by Claude Code from [the heist plan](../docs/superpowers/plans/2026-09-25-showcase-heist.md) on `prototype/vertical-slice`: the porch Showcase (§10), porch theft with the alarm and raid cooldown (§11), the Practice House (§11 "Dummy base"), and the "nothing deleted" returns. Verified solo; see [HANDOFF.md](HANDOFF.md).
+
+- **Prototype proposals, not adopted design** (the user never ruled on them; built as written, tune or overrule freely):
+
+  | Decision | Built as |
+  | --- | --- |
+  | Porch incubation | Every free porch slot unwraps; the Chonk stays on that slot |
+  | Porch unwrap speed | × 0.5 of the Vault time |
+  | Steal prompt | Hold 1.5 s within 8 studs |
+  | What can be stolen | Revealed porch Chonks and burritos unwrapping on the porch |
+  | Stolen burrito progress | Keeps its unwrap fraction and resumes wherever it is deposited |
+  | Depositing a carried Chonk | "Put in Vault" stashes it on a free pad with no unwrap; a porch slot shows it off |
+  | Bat inside the district | Unchanged: field only, so a thief crossing the district cannot be stopped yet |
+  | Dropped stolen item | Anyone may pick it up; after 60 s untouched it returns to its last owner, porch first, then Vault, else it waits |
+  | Victim leaves mid-theft | The carried item leaves with the victim (session-only) |
+  | Alarm | Porch lights blink red for 6 s; victim and thief get the theft toasts; no sound yet |
+  | Practice House | At the district centre (0, 24), a random Common, one kept per player per session, refilled 45 s after it is taken |
+
+- **Rulings made while building** (the plan left these open):
+  - "Put here" on a porch pad uses that pad when it is free, else the first free slot.
+  - Theft toasts name a Chonk by its Catalog name, but a burrito as "Blanket Burrito", so a theft never spoils what is inside.
+  - A burrito returning to a full porch goes into a free Vault incubator and resumes its unwrap; a Chonk goes to a free Vault pad.
+  - The alarm runs 6 real seconds, independent of the Studio time-scale hook.
+  - Draft copy for the heist is in `Strings.luau` (`Toasts`, `Theft`, `Prompts`, `Showcase`) and needs partner review.
+- **Fixed:** `default.project.json` used `Position`, which Rojo does not serialise, so built places buried the map under the Baseplate. It now uses `CFrame`.
+- **Known minor issues, deferred** (from the final review):
+  - A stolen burrito keeps its model under the victim's plot while it unwraps in the thief's Vault. State is unaffected.
+  - The loose-return and practice-respawn loops don't isolate errors per item, so one error would stop them for the session. None has been seen.
+  - When a robbed owner leaves and a new owner is robbed within 6 s, the porch lights can flicker.
+  - `Vault.addRecord`'s "no pad" result isn't checked before an item is forgotten. This can't happen today, but it would matter if the Vault ever grows beyond its built pads.
+  - `Config.Showcase.slots` above 2 errors at boot, because only two porch pads are built.
+  - The steal reach check reads `Config.Nest.grabDistance`, while the prompt reads `Config.Showcase.placeDistance` (both 8).
+  - A Chonk that has been carried no longer collides.
+- Unchanged: the spec's open questions below. Shields, defences, Grudge/Wanted, the rookie shield and porch growth past 2 slots remain later Alpha work.
 
 ## Vertical-slice prototype: 2026-09-24
 

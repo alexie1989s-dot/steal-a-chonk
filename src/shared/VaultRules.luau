@@ -13,6 +13,11 @@ export type DepositContext = {
 	vaultCount: number,
 }
 
+-- Incubating burritos reserve a display pad, so they count against the Vault's capacity.
+function VaultRules.hasRoom(vaultCount: number, incubating: number): boolean
+	return vaultCount + incubating < Config.Vault.displaySlots
+end
+
 -- Returns (true, slot) or (false, reason). Reasons match Strings.Toasts keys.
 function VaultRules.canDeposit(ctx: DepositContext): (boolean, any)
 	if not ctx.carrying then
@@ -29,7 +34,7 @@ function VaultRules.canDeposit(ctx: DepositContext): (boolean, any)
 			freeSlot = slot
 		end
 	end
-	if ctx.vaultCount + incubating >= Config.Vault.displaySlots then
+	if not VaultRules.hasRoom(ctx.vaultCount, incubating) then
 		return false, "vaultFull"
 	end
 	if not freeSlot then
@@ -38,7 +43,29 @@ function VaultRules.canDeposit(ctx: DepositContext): (boolean, any)
 	return true, freeSlot
 end
 
-function VaultRules.incomePerSecond(records: { { tier: string, size: number } }): number
+export type StashContext = {
+	carrying: boolean,
+	atOwnIncubator: boolean,
+	vaultCount: number,
+	incubating: number,
+}
+
+-- A carried Chonk goes straight onto a display pad: it needs room, not a free incubator.
+function VaultRules.canStash(ctx: StashContext): (boolean, string?)
+	if not ctx.carrying then
+		return false, "notCarrying"
+	end
+	if not ctx.atOwnIncubator then
+		return false, "notYourBase"
+	end
+	if not VaultRules.hasRoom(ctx.vaultCount, ctx.incubating) then
+		return false, "vaultFull"
+	end
+	return true
+end
+
+-- Records may be a list or a pad map with holes.
+function VaultRules.incomePerSecond(records: { [number]: { tier: string, size: number } }): number
 	local total = 0
 	for _, record in records do
 		total += Formulas.incomePerSecond(record.tier, record.size)

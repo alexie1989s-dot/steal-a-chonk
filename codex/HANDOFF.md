@@ -1,6 +1,128 @@
 # Current handoff
 
-Updated: 2026-09-25 by Claude Code. The vertical-slice greybox prototype was built on 2026-09-24. The Codex art notes further down (2026-09-07) are history: art is paused during the prototype.
+Updated: 2026-09-29 by Claude Code. The vertical-slice greybox prototype was built on 2026-09-24; the Showcase heist (Alpha step 1) was built on top of it on 2026-09-27; the presentation pass landed on 2026-09-29. The Codex art notes further down (2026-09-07) are history: art is paused during the prototype.
+
+## 2026-09-29 Presentation pass (Claude Code)
+
+The user asked for the prototype to stop looking "ugly and unfinished" and to read as close to a
+finished game as possible, and asked whether better models were possible without Blender. They
+were: **everything below is built from Studio primitives only.** Asked how far to bend the paused
+art track, the user chose **part-craft only** -- no Blender, no Meshy, no Studio AI generation, no
+Creator Store assets. See `PROJECT_CONTEXT.md` for the ruling.
+
+**This is still placeholder greybox art.** No Chonk has been accepted by the partner devs, and the
+art milestone (one accepted Chonk, then a second to prove repeatability) is untouched. What changed
+is how the prototype presents itself so the loop can be judged on its own terms.
+
+**What changed:**
+1. **Lighting.** `default.project.json` set no `Lighting` properties at all, so the prototype ran on
+   Studio's flat defaults. It now sets ShadowMap shadows, a mid-afternoon `ClockTime`, warm ambient
+   and colour shift, and carries an `Atmosphere`, a `Sky`, and Bloom, ColorCorrection, SunRays and
+   DepthOfField effects. This was the single biggest change per line of code.
+2. **Ten distinct Chonks.** `Models.chonk` was a sphere with two ears and two eyes (5 parts). It now
+   reads the catalog's existing `species` field and builds a per-species silhouette from 13-32 parts:
+   the frog's eyes ride on top of its head, the penguin has a tuxedo front and a tapering beak, the
+   capybara's snout is an actual box, the axolotl has three frills a side, the corgi's legs plainly
+   do not reach the ground, the panda has patches and a saddle. Eye catchlights, blush and a muzzle
+   do most of the "affectionate" work (spec §1).
+3. **Geometry contract kept.** Vault, Showcase and DummyBase all rest a Chonk with `pad.Y + d / 2`
+   and hang its tag at `d / 2 + 1.5`, where `d = 4 * sizeScale(size)`. The body's Y extent is still
+   exactly `d` and the pivot is still the body centre, so no caller changed.
+4. **Burrito and guardian.** The burrito is a smooth bundle with rounded ends and a neon tier bow;
+   Mama Chonk gained a brow, pupils, a snout and teeth so she reads as a threat (spec §11).
+5. **World.** Layered paving with a centre medallion, a striped kerb with rounded caps, a safe-side
+   neon line and lamp posts, woven nest bowls with twig rims, rounded hedges, and a deterministic
+   scatter of trees, rocks, flower patches and grass patches over the field (seeded, so both devs see
+   the same field). A real signpost replaces the floating zone text. The baseplate went 800 -> 2400
+   because its edge was visible from the district.
+6. **Houses.** Taller walls with capping trim, a red gable roof over the back wall, a door, windows,
+   a porch pergola, a step, lit Showcase pedestals, ringed Vault pads, glass incubator domes and a
+   stand for the wheel. **The play area is deliberately left unroofed:** the Vault pads are inside
+   the house and a roof over them fights the camera every time a player walks in to sort Chonks.
+7. **HUD.** Stat pills with chip icons, gradients, strokes and drop shadows; counters that roll up
+   and flash on a gain; a toast that drops in. A `UIScale` shrinks the bar on narrow screens (§2).
+8. **Idle motion.** A new client `Idle` module bobs and sways seated Chonks. It is decoration only:
+   the models are anchored and the server never moves them. `Carry.setStatus` is the single status
+   writer, so it adds the `ChonkIdle` tag when a Chonk is seated and removes it the moment the
+   server takes it back, which is what stops a carried model being pinned to a remembered pose.
+9. **Readability fix.** Ten Vault pads sit seven studs apart and at the old 80-stud tag range all ten
+   name tags overlapped into one smear. `Models.nameLabel` takes a range; the Vault passes 30
+   (`Config.Vault.labelDistance`) while porch bait keeps the long range on purpose.
+
+**Verified:** `lune run tests/run` 74 passed; `stylua --check src tests` clean; `selene src` 0 warnings;
+`rojo build` clean. In Studio (solo play, via the local MCP bridge): clean boot with no errors;
+`fillVault` + `toPorch` gave plot 1, Vault 9, Showcase 1, 10 Chonk models, 10 idle-tagged, 385 plot
+parts, 16 prompts; cash ticked; a client sample of a tagged model's height moved 3.362 -> 3.490 over
+five frames, so the idle bob is running. Screenshots were taken at each step and the geometry was
+corrected against them, not guessed.
+
+**Found by looking rather than by reasoning** (each was wrong in the first build and fixed after a
+screenshot): belly patches were entirely buried inside the body sphere; `WedgePart` ears vanished
+edge-on and a 45-degree square still read as a square; the kerb caps had a doubled rotation and stood
+up as bollards; the gable slabs' rotation sign was matched to `side`, which built a valley instead of
+a roof; the wheel stand was aligned to the flat treadle instead of the upright ring.
+
+**Not done, and why:** **sound.** The game still has no audio at all, and that is the biggest single
+thing still missing. Every route to it needs an uploaded asset id, which is outside "part-craft
+only", so it needs a ruling first -- Roblox's own official free SFX library is the obvious candidate.
+
+**Next step:** unchanged -- the testers run the two-player checklist below and judge the feel, and the
+devs rule on the heist proposals. The presentation pass touched no rules, so that checklist still
+stands as written.
+
+## 2026-09-27 Showcase heist (Claude Code)
+
+Built from [the heist plan](../docs/superpowers/plans/2026-09-25-showcase-heist.md) on `prototype/vertical-slice`, with its proposals as written (see `PROJECT_CONTEXT.md`). Verified solo; the two-player checks below are still open.
+
+**What a player can now do, on top of the slice:**
+1. Press **Put here** (E) on one of two porch pads to unwrap a burrito there at half the Vault time, or to show off a Chonk. Porch Chonks earn +50 %.
+2. Press **To Vault** on a porch Chonk or **To Porch** on a Vault Chonk while standing at home.
+3. Hold **Steal** (E, 1.5 s) on a neighbour's porch item and carry it home under the normal carry rules; **Put in Vault** at an incubator stashes a carried Chonk straight onto a Vault pad.
+4. Practise on the **Practice House** at the district centre: one free Common per player per session, refilled 45 s after it is taken.
+5. As the victim: porch lights blink red for 6 s, both players get a toast ("Beans has been stolen. Beans is not surprised."), and the porch is immune for 2 minutes with a countdown sign.
+6. Nothing is deleted while its owner is on the server: a dropped stolen item walks home after 60 s (porch first, then Vault), and an item whose carrier leaves goes straight back. When an owner leaves, their items leave with them (session-only prototype).
+
+**End-to-end at real speed (timeScale 1), real key and mouse input, DevHooks only for `state`:** walked to the Practice House and held E 1.7 s → carrying a Common at 12.8; walked home and pressed E at the incubator → "Stashed in the Vault", Vault 1, cash ticking; stood on the wheel and pressed E 70 times → 150 Zoomies (speed 23.2); walked to nest 5 and pressed E. The first try was caught by the Patroller right after the grab (she was on the near side of her loop). The retry was timed for the far side and made it home carrying (18.8 vs her 17). E on the porch pad → the burrito showed 9.5 s left against 20 s in the Vault, revealed at 9.8 s, and the reveal card read "Kevin, A Fine Boi … +1.5 cash/s"; a click dismissed it. Income 2.5/s = 1 (Vault Common) + 1.5 (porch Common). The console showed only the boot lines.
+
+**Map fix found during the playtest:** Rojo 7.7 silently drops the `Position` property, so every fresh `rojo build` had put the 20-stud Baseplate at y = 0 and buried the whole map, player houses included, under the grass. `default.project.json` now sets an explicit `CFrame` for the Baseplate (y −10) and the SpawnLocation. The built XML was checked. Anyone with an older built place should rebuild it.
+
+**Final review (fresh reviewer, Opus):** verdict "ready to merge", with no Critical or Important findings as labelled. Three of its minors were re-graded by their effect on players and fixed, each with a test that failed first:
+- A practice Chonk shown on a porch had two stacked name tags. Studio check: 2 → 1.
+- A player who had already kept a practice Chonk could grab a loose one they could never deposit, and was stuck at carry speed. `Carry.pickUp` now refuses with `dummyDone`. Studio check: grab succeeded → refused.
+- The 1.5 s Steal hold was enforced only by the client. The server now times the hold itself (`ShowcaseRules.heldLongEnough`, 0.25 s jitter allowance). A new Lune test covers it (74 tests pass). Real input: a 0.4 s tap took nothing, and a 1.7 s hold stole.
+
+The deferred minors are listed in `PROJECT_CONTEXT.md` under the heist section.
+
+**Two-player checklist for the testers** (Studio → Test → Clients and Servers, 2 players):
+1. Only the neighbour sees **Steal**; only the owner sees **Put here**, **To Vault**, **To Porch**, **Put in Vault** and **Pedal!**
+2. The neighbour steals a porch Chonk. The victim's porch lights flash red, both toasts appear, and the thief walks home at carry speed and deposits it.
+3. A second steal on the same porch within 2 minutes → the "just robbed" toast.
+4. The thief resets mid-carry: the Chonk lies loose, then returns to the victim after 60 s.
+5. The victim leaves while the thief carries: the Chonk vanishes from the thief's hands, the thief's speed resets, and the thief gets the "went home" toast.
+6. The bat in the field still drops a thief's Chonk; inside the curb it does nothing (proposal row "Bat inside the district").
+7. The slice's pending check: two-player bat hit in the field (see the slice section below).
+
+**Outstanding:**
+- The two-player checklist above has not been run: the Studio MCP only starts solo playtests.
+- Persistence is still absent (session-only). No phone test and no performance test yet.
+
+**Feel notes from the runs (for the testers to judge):**
+- A rookie still has to time the Patroller, even at ~160 Zoomies: she caught the first grab at 18.8 vs 17.
+- A carried size-1 Chonk sits slightly into the avatar's hair (lift 3.6 studs).
+- The practice-house sign repeats its title ("Practice House" over "PRACTICE HOUSE: steal the Chonk…"). All heist copy is draft.
+
+**DevHooks added:** `porch(name)`, `toVault(name, slot)`, `toPorch(name, pad)`, `steal(name, plotIndex, slot)` (`plotIndex` 0 = the Practice House), `robMe(name, slot)` (Studio-only victim seam). `state` now has `items` (replacing `burritos`) and `dummy`, and each player has `showcase`, `immuneFor` and `dummyTaken`.
+
+**Next step:** the testers run the two-player checklist and judge the feel; the devs rule on the heist proposals. Then the rest of the Alpha (shields and the away timer, Grudge/Wanted, rebirth and Zone 2, persistence).
+
+Per-task evidence:
+
+- **Task 1 (pure rules):** new `Slots` and `ShowcaseRules`, `VaultRules.hasRoom/canStash`, `Format.clock`, `Config.Showcase/DummyBase` and the heist copy in `Strings`. `lune run tests/run`: 73 passed. StyLua and Selene clean.
+- **Task 2 (refactor):** every physical item is one `Carry.Item` registry entry (`register/forget/items/setStatus`); Vault records are keyed by display pad; `Models.chonk` is welded; label helpers moved to `Models`. Studio regression through DevHooks at timeScale 0.05: grab → deposit → Vault 1 after 5.5 s (Uncommon size 5), income 35/s; a carried nest-2 burrito shows `carried` and wakes guardian 2; a dropped burrito is back `ready` at its nest after 3.5 s; `fillVault` then deposit → `false, "vaultFull"` while still carrying. Console showed only the boot lines.
+- **Task 3 (porch Showcase):** two `Showcase` pads, porch lights and a hidden raid-cooldown sign per plot; "Put here", "To Vault", "To Porch" and "Put in Vault" prompts; porch unwrap at half the Vault time; porch income ×1.5; a client `PromptFilter` shows owner prompts only to the owner. Studio at timeScale 0.05: a Common size 1 placed on the porch reported 0.50 s left (Vault: 1.0 s) and revealed as a Chonk with the reveal card shown; income 1.5/s on the porch, 1/s after "To Vault"; "To Porch" put it back; "To Vault" from the field → `awayFromHome`; a third item on a full porch → `porchFull` while still carrying. Client: own pedal, incubator, move and place prompts enabled; another plot's place and pedal prompts disabled. Console clean.
+- **Task 4 (stealing and the practice house):** neighbours see a 1.5 s "Steal" hold on porch items; a new `DummyBase` builds a practice house at (0, 24) with a random Common on its porch. Carried Chonks can be stashed in the Vault or shown on the porch; a stolen burrito keeps its unwrap fraction. Studio at timeScale 0.05: stealing the practice Chonk at 0 Zoomies gave WalkSpeed 12.8; deposit → Vault +1, `dummyTaken`, income 1/s; a second practice steal → `dummyDone`; stealing from your own porch → `yours`; stealing while carrying → `alreadyCarrying`. Same-call races: two steals → `true` then `taken` with exactly one carried practice Chonk; the owner's "To Vault" then a steal → move `true`, steal `taken`, Chonk only in the Vault. Full Vault and porch → `vaultFull` and `porchFull` while still carrying. The practice porch refilled 2.40 s after the steal (45 s × 0.05 plus the 0.25 s tick). Console clean.
+- **Task 5 (victim side, nothing deleted):** a theft starts the victim's raid cooldown (120 s × timeScale), blinks their porch lights red for 6 s, shows a "Raid cooldown m:ss" sign and sends both theft toasts. Dropped owned items walk home after 60 s (porch first, then Vault); an item whose carrier leaves goes straight back; when an owner leaves, their items leave with them and a thief carrying one is told. Studio at timeScale 0.05, through the `robMe` victim seam: a porch burrito robbed at 53 % done lay loose with its owner set; `immuneFor` 6.0; a porch light read red within 1 s and was back to normal at 6.6 s; the sign read "Raid cooldown 0:06", then 0:04, and hid at 6.4 s; the burrito was back on its porch after 3.07 s with 0.22 of its 0.5 s left (resumed, not restarted). Kicking a thief who carried the practice Chonk put the same Chonk (same id) back on the practice porch, with no loose copy. Kicking an owner whose Chonk lay loose and whose burrito was incubating left no owned items, no models on the plot, both "Put here" prompts restored and no incubator label.
+- **Tooling note:** after the latest Studio update, Claude Code rejects the Studio MCP's tool list (`ttlMs`/`cacheScope` schema), so its tools do not load. The session drove StudioMCP.exe over stdio through a small local bridge instead. Non-ASCII text in `execute_luau` code arrives mangled, so the Rojo plugin (or byte-escaped strings) is the safe way to sync sources.
 
 ## 2026-09-25 (Claude Code)
 

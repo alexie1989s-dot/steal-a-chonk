@@ -10,11 +10,14 @@ export type State = {
 	cash: number,
 	zoomies: number,
 	plot: number?,
-	carrying: any?, -- Burrito (owned by Nests/Carry)
+	carrying: any?, -- Carry.Item
 	inBase: boolean,
-	vault: { ChonkRecord },
+	vault: { [number]: ChonkRecord }, -- display pad -> record, holes allowed
+	showcase: { [number]: any }, -- porch slot -> Carry.Item
 	incubators: { [number]: any }, -- slot -> incubation record (Vault)
 	nextUid: number,
+	immuneUntil: number, -- os.clock() when the raid cooldown ends; 0 = never robbed
+	dummyTaken: boolean, -- kept a dummy-house Chonk this session
 }
 
 local PlayerState = {
@@ -56,8 +59,11 @@ local function add(player: Player)
 		carrying = nil,
 		inBase = true,
 		vault = {},
+		showcase = {},
 		incubators = {},
 		nextUid = 1,
+		immuneUntil = 0,
+		dummyTaken = false,
 	}
 	PlayerState.Added:Fire(player)
 	PlayerState.sync(player)

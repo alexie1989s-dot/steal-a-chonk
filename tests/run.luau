@@ -64,6 +64,18 @@ local suites: { { name: string, load: () -> () } } = {
 			require("./BatRules.spec")
 		end,
 	},
+	{
+		name = "Slots",
+		load = function()
+			require("./Slots.spec")
+		end,
+	},
+	{
+		name = "ShowcaseRules",
+		load = function()
+			require("./ShowcaseRules.spec")
+		end,
+	},
 }
 
 local loadFailures = {}

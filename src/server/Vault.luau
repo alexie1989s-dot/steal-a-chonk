@@ -1,5 +1,6 @@
 -- The Vault (spec §10): two incubators unwrap burritos into Chonks that earn cash forever.
--- Safe: nothing here can be stolen. Session-only in the vertical slice.
+-- Safe: nothing here can be stolen. Records live on display pads (state.vault[pad]). Session-only.
+local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Catalog = require(ReplicatedStorage.Shared.Catalog)
@@ -7,25 +8,29 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
 local Formulas = require(ReplicatedStorage.Shared.Formulas)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local ShowcaseRules = require(ReplicatedStorage.Shared.ShowcaseRules)
+local Signal = require(ReplicatedStorage.Shared.Signal)
+local Slots = require(ReplicatedStorage.Shared.Slots)
 local Strings = require(ReplicatedStorage.Shared.Strings)
 local VaultRules = require(ReplicatedStorage.Shared.VaultRules)
 local Carry = require(script.Parent.Carry)
 local Models = require(script.Parent.Models)
-local Nests = require(script.Parent.Nests)
 local PlayerState = require(script.Parent.PlayerState)
 local Plots = require(script.Parent.Plots)
 
 type Incubation = {
-	burrito: Carry.Burrito,
+	burrito: Carry.Item,
 	startedAt: number,
-	duration: number,
+	duration: number, -- full unwrap time, before Config.Debug.timeScale
 	label: TextLabel,
 }
 
-local Vault = {}
+local Vault = {
+	MoveRequested = Signal.new(), -- (player, pad): the owner pressed "To Porch" on a Vault display
+}
 
--- Display models by player, in vault order.
-local displays: { [Player]: { Model } } = {}
+-- Display models by player, keyed by pad.
+local displays: { [Player]: { [number]: Model } } = {}
 
 local function toast(player: Player, key: string)
 	local text = Strings.Toasts[key]
@@ -34,58 +39,88 @@ local function toast(player: Player, key: string)
 	end
 end
 
-local function progressLabel(parent: BasePart): TextLabel
-	local gui = Instance.new("BillboardGui")
-	gui.Name = "Unwrap"
-	gui.Size = UDim2.fromOffset(140, 36)
-	gui.StudsOffset = Vector3.new(0, 5, 0)
-	gui.Parent = parent
-	local label = Instance.new("TextLabel")
-	label.Size = UDim2.fromScale(1, 1)
-	label.BackgroundColor3 = Color3.fromRGB(40, 36, 52)
-	label.BackgroundTransparency = 0.2
-	label.Font = Enum.Font.FredokaOne
-	label.TextScaled = true
-	label.TextColor3 = Color3.new(1, 1, 1)
-	label.Parent = gui
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 10)
-	corner.Parent = label
-	return label
-end
-
-local function placeDisplay(player: Player, record: PlayerState.ChonkRecord, slot: number)
+local function placeDisplay(player: Player, record: PlayerState.ChonkRecord, pad: number)
 	local state = PlayerState.get(player)
 	if not (state and state.plot) then
 		return
 	end
-	local pad = Plots.part(state.plot, `Display{slot}`)
+	local part = Plots.part(state.plot, `Display{pad}`)
 	local entry = Catalog.byId[record.chonkId]
 	local model = Models.chonk(entry, record.size)
 	model.Name = `Chonk{record.uid}`
 	local d = 4 * Formulas.sizeScale(record.size)
 	local facing = Plots.frame(state.plot).Rotation
-	model:PivotTo(CFrame.new(pad.Position + Vector3.new(0, 0.15 + d / 2, 0)) * facing)
+	model:PivotTo(CFrame.new(part.Position + Vector3.new(0, 0.15 + d / 2, 0)) * facing)
 
 	local card = VaultRules.revealCard(record)
-	local gui = Instance.new("BillboardGui")
-	gui.Size = UDim2.fromOffset(200, 50)
-	gui.StudsOffset = Vector3.new(0, d / 2 + 1.5, 0)
-	gui.MaxDistance = 80
-	gui.Parent = model.PrimaryPart
-	local label = Instance.new("TextLabel")
-	label.Size = UDim2.fromScale(1, 1)
-	label.BackgroundTransparency = 1
-	label.Font = Enum.Font.FredokaOne
-	label.TextScaled = true
-	label.TextColor3 = Models.rgb(Config.TierColors[record.tier])
-	label.TextStrokeTransparency = 0.3
-	label.Text = `{card.displayName}\n{string.format(Strings.Reveal.incomeFormat, Format.rate(card.incomePerSecond))}`
-	label.Parent = gui
+	Models.nameLabel(
+		model,
+		`{card.displayName}\n{string.format(Strings.Reveal.incomeFormat, Format.rate(card.incomePerSecond))}`,
+		Models.rgb(Config.TierColors[record.tier]),
+		d / 2 + 1.5,
+		Config.Vault.labelDistance
+	)
+
+	local move = Instance.new("ProximityPrompt")
+	move.Name = "MovePrompt"
+	move.ActionText = Strings.Prompts.toPorch
+	move.ObjectText = card.displayName
+	move.HoldDuration = 0
+	move.MaxActivationDistance = Config.Vault.promptDistance
+	move.RequiresLineOfSight = false
+	Plots.tagPrompt(move, state.plot, "owner")
+	move.Parent = model.PrimaryPart
+	move.Triggered:Connect(function(who: Player)
+		if who == player then
+			Vault.MoveRequested:Fire(player, pad)
+		end
+	end)
 
 	model.Parent = Plots.model(state.plot)
+	-- Tagged last, once it is posed and parented, so the client reads the right resting pose.
+	-- A Vault display is a plain model rather than a Carry item, so it keeps the tag until it
+	-- is destroyed; removeRecord destroys it, which drops the tag with it.
+	CollectionService:AddTag(model, Config.Tags.chonkIdle)
 	displays[player] = displays[player] or {}
-	displays[player][slot] = model
+	displays[player][pad] = model
+end
+
+-- Puts a record on the first free display pad and shows it. Callers check room first
+-- (VaultRules.hasRoom / canStash / ShowcaseRules.canMoveToVault). Returns the pad, or nil when full.
+function Vault.addRecord(player: Player, record: PlayerState.ChonkRecord): number?
+	local state = PlayerState.get(player)
+	if not state then
+		return nil
+	end
+	local pad = Slots.firstFree(state.vault, Config.Vault.displaySlots)
+	if not pad then
+		return nil
+	end
+	state.vault[pad] = record
+	placeDisplay(player, record, pad)
+	PlayerState.sync(player)
+	return pad
+end
+
+-- Takes a record off its pad and removes its display. Never yields.
+function Vault.removeRecord(player: Player, pad: number): PlayerState.ChonkRecord?
+	local state = PlayerState.get(player)
+	local record = state and state.vault[pad]
+	if not (state and record) then
+		return nil
+	end
+	state.vault[pad] = nil
+	local model = displays[player] and displays[player][pad]
+	if model then
+		model:Destroy()
+		displays[player][pad] = nil
+	end
+	PlayerState.sync(player)
+	return record
+end
+
+local function incubatingCount(state: PlayerState.State): number
+	return Slots.count(state.incubators)
 end
 
 local function reveal(player: Player, slot: number, incubation: Incubation)
@@ -93,14 +128,19 @@ local function reveal(player: Player, slot: number, incubation: Incubation)
 	if not state then
 		return
 	end
+	-- An incubating burrito always has a pad reserved (VaultRules.hasRoom), so this finds one.
+	local pad = Slots.firstFree(state.vault, Config.Vault.displaySlots)
+	if not pad then
+		state.incubators[slot] = incubation -- try again next tick rather than lose the Chonk
+		return
+	end
 	local roll = incubation.burrito.roll
 	local record = { uid = state.nextUid, chonkId = roll.chonkId, tier = roll.tier, size = roll.size }
 	state.nextUid += 1
-	table.insert(state.vault, record)
-	state.incubators[slot] = nil
+	state.vault[pad] = record
 	incubation.label.Parent:Destroy()
-	Nests.consume(incubation.burrito)
-	placeDisplay(player, record, #state.vault)
+	Carry.forget(incubation.burrito)
+	placeDisplay(player, record, pad)
 	PlayerState.sync(player)
 	Remotes.get("Reveal"):FireClient(player, VaultRules.revealCard(record))
 end
@@ -124,32 +164,70 @@ function Vault.deposit(player: Player, plotIndex: number): (boolean, string?)
 	if not inReach then
 		return false, "tooFar"
 	end
+	local carried = state.carrying
+	local keep, keepReason = ShowcaseRules.canKeep(carried and carried.dummy, state.dummyTaken)
+	if not keep then
+		toast(player, keepReason :: string)
+		return false, keepReason
+	end
+	local atOwnIncubator = state.plot ~= nil and state.plot == plotIndex
+
+	-- A carried Chonk (stolen or practice) goes straight onto a display pad.
+	if carried and carried.kind == "chonk" then
+		local ok, reason = VaultRules.canStash({
+			carrying = true,
+			atOwnIncubator = atOwnIncubator,
+			vaultCount = Slots.count(state.vault),
+			incubating = incubatingCount(state),
+		})
+		if not ok then
+			toast(player, reason :: string)
+			return false, reason
+		end
+		local item = Carry.take(player) :: Carry.Item
+		Carry.adopt(player, item)
+		Vault.addRecord(
+			player,
+			{ uid = item.uid :: number, chonkId = item.roll.chonkId, tier = item.roll.tier, size = item.roll.size }
+		)
+		Carry.forget(item)
+		toast(player, "stashed")
+		return true
+	end
+
 	local ok, result = VaultRules.canDeposit({
-		carrying = state.carrying ~= nil,
-		atOwnIncubator = state.plot ~= nil and state.plot == plotIndex,
+		carrying = carried ~= nil,
+		atOwnIncubator = atOwnIncubator,
 		incubators = state.incubators,
-		vaultCount = #state.vault,
+		vaultCount = Slots.count(state.vault),
 	})
 	if not ok then
 		toast(player, result)
 		return false, result
 	end
-	local slot = result :: number
 	local burrito = Carry.take(player)
 	if not burrito then
 		return false, "notCarrying"
 	end
-	burrito.status = "incubating"
-	local pad = Plots.part(plotIndex, `Incubator{slot}`)
+	Carry.adopt(player, burrito)
+	Vault.startIncubation(player, result :: number, burrito)
+	toast(player, "unwrapping")
+	return true
+end
+
+-- Puts a taken burrito into incubator `slot`, resuming from `burrito.progress` (a stolen porch burrito keeps
+-- its unwrap fraction).
+function Vault.startIncubation(player: Player, slot: number, burrito: Carry.Item)
+	local state = PlayerState.get(player) :: PlayerState.State
+	Carry.setStatus(burrito, "incubating")
+	local pad = Plots.part(state.plot :: number, `Incubator{slot}`)
 	burrito.model:PivotTo(CFrame.new(pad.Position + Vector3.new(0, 2.2, 0)))
 	state.incubators[slot] = {
 		burrito = burrito,
 		startedAt = os.clock(),
 		duration = Formulas.unwrapSeconds(burrito.roll.tier, burrito.roll.size),
-		label = progressLabel(pad),
+		label = Models.progressLabel(pad),
 	}
-	toast(player, "unwrapping")
-	return true
 end
 
 function Vault.fill(player: Player)
@@ -158,15 +236,12 @@ function Vault.fill(player: Player)
 		return
 	end
 	-- Leave room for burritos already incubating: they each need a display pad when they hatch.
-	local incubating = 0
-	for _ in state.incubators do
-		incubating += 1
-	end
-	while #state.vault + incubating < Config.Vault.displaySlots do
+	while VaultRules.hasRoom(Slots.count(state.vault), incubatingCount(state)) do
+		local pad = Slots.firstFree(state.vault, Config.Vault.displaySlots) :: number
 		local record = { uid = state.nextUid, chonkId = "cat_beans", tier = "Common", size = 1 }
 		state.nextUid += 1
-		table.insert(state.vault, record)
-		placeDisplay(player, record, #state.vault)
+		state.vault[pad] = record
+		placeDisplay(player, record, pad)
 	end
 	PlayerState.sync(player)
 end
@@ -176,11 +251,12 @@ function Vault.start()
 		for slot = 1, Config.Vault.incubators do
 			local prompt = Instance.new("ProximityPrompt")
 			prompt.Name = "UnwrapPrompt"
-			prompt.ActionText = Strings.Prompts.unwrap
+			prompt.ActionText = Strings.Prompts.vaultDeposit
 			prompt.ObjectText = Strings.Prompts.incubatorObject
 			prompt.HoldDuration = 0
 			prompt.MaxActivationDistance = Config.Vault.promptDistance
 			prompt.RequiresLineOfSight = false
+			Plots.tagPrompt(prompt, plotIndex, "owner")
 			prompt.Parent = Plots.part(plotIndex, `Incubator{slot}`)
 			prompt.Triggered:Connect(function(player: Player)
 				Vault.deposit(player, plotIndex)
@@ -193,7 +269,7 @@ function Vault.start()
 		if state then
 			for _, incubation: Incubation in state.incubators do
 				incubation.label.Parent:Destroy()
-				Nests.consume(incubation.burrito)
+				Carry.forget(incubation.burrito)
 			end
 		end
 		for _, model in displays[player] or {} do
@@ -209,7 +285,11 @@ function Vault.start()
 			local now, scale = os.clock(), Config.Debug.timeScale
 			for player, state in PlayerState.all() do
 				for slot, incubation: Incubation in table.clone(state.incubators) do
-					local remaining = incubation.duration * scale - (now - incubation.startedAt)
+					local duration = incubation.duration * scale
+					local remaining = ShowcaseRules.remainingSeconds(
+						ShowcaseRules.progressAt(incubation.burrito.progress or 0, incubation.startedAt, duration, now),
+						duration
+					)
 					if remaining <= 0 then
 						-- Own thread: an error in one reveal must not stop every other incubator.
 						state.incubators[slot] = nil
@@ -222,14 +302,20 @@ function Vault.start()
 		end
 	end)
 
-	-- Income: every Vault Chonk earns every second (spec §5 step 6).
+	-- Income: every Vault and porch Chonk earns every second (spec §5 step 6); the porch earns +50 % (§10).
 	task.spawn(function()
 		local period = Config.Economy.incomeTickSeconds
 		while true do
 			task.wait(period)
 			for player, state in PlayerState.all() do
-				if #state.vault > 0 then
-					state.cash += VaultRules.incomePerSecond(state.vault) * period
+				local porch = {}
+				for slot, item in state.showcase do
+					if item.kind == "chonk" then
+						porch[slot] = item.roll
+					end
+				end
+				if next(state.vault) or next(porch) then
+					state.cash += ShowcaseRules.incomePerSecond(state.vault, porch) * period
 					PlayerState.sync(player)
 				end
 			end

@@ -3,14 +3,17 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local Slots = require(ReplicatedStorage.Shared.Slots)
 local Bat = require(script.Parent.Bat)
 local Carry = require(script.Parent.Carry)
 local DevHooks = require(script.Parent.DevHooks)
+local DummyBase = require(script.Parent.DummyBase)
 local Guardians = require(script.Parent.Guardians)
 local Movement = require(script.Parent.Movement)
 local Nests = require(script.Parent.Nests)
 local PlayerState = require(script.Parent.PlayerState)
 local Plots = require(script.Parent.Plots)
+local Showcase = require(script.Parent.Showcase)
 local Vault = require(script.Parent.Vault)
 
 local DevActions = {}
@@ -37,9 +40,16 @@ function DevActions.start()
 			local character = player.Character
 			local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 			local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
-			local incubating = 0
-			for _ in state.incubators do
-				incubating += 1
+			local incubating = Slots.count(state.incubators)
+			local showcase = {}
+			for slot, item in state.showcase do
+				showcase[tostring(slot)] = {
+					kind = item.kind,
+					status = item.status,
+					tier = item.roll.tier,
+					size = item.roll.size,
+					remaining = Showcase.remaining(item) or false,
+				}
 			end
 			players[player.Name] = {
 				cash = state.cash,
@@ -47,8 +57,11 @@ function DevActions.start()
 				plot = state.plot,
 				carrying = if state.carrying then state.carrying.roll.tier else false,
 				inBase = state.inBase,
-				vault = #state.vault,
+				vault = Slots.count(state.vault),
 				incubating = incubating,
+				showcase = showcase,
+				immuneFor = math.max(state.immuneUntil - os.clock(), 0),
+				dummyTaken = state.dummyTaken,
 				walkSpeed = humanoid and humanoid.WalkSpeed or -1,
 				position = root and { root.Position.X, root.Position.Y, root.Position.Z } or false,
 			}
@@ -95,20 +108,27 @@ function DevActions.start()
 		end
 		return list
 	end)
-	DevActions.addStateSection("burritos", function()
+	DevActions.addStateSection("items", function()
 		local list = {}
-		for _, burrito in Nests.burritos() do
-			local p = burrito.model:GetPivot().Position
+		for _, item in Carry.items() do
+			local p = item.model:GetPivot().Position
 			table.insert(list, {
-				id = burrito.id,
-				nest = burrito.nest,
-				status = burrito.status,
-				tier = burrito.roll.tier,
-				carrier = if burrito.carrier then burrito.carrier.Name else false,
+				id = item.id,
+				kind = item.kind,
+				status = item.status,
+				tier = item.roll.tier,
+				nest = item.nest or false,
+				owner = if item.owner then item.owner.Name else false,
+				carrier = if item.carrier then item.carrier.Name else false,
+				dummy = item.dummy == true,
 				position = { p.X, p.Y, p.Z },
 			})
 		end
 		return list
+	end)
+	DevActions.addStateSection("dummy", function()
+		local item = DummyBase.item()
+		return if item then { id = item.id, status = item.status } else false
 	end)
 	DevActions.addStateSection("snapBacks", function()
 		return Movement.snapBacks
@@ -145,6 +165,20 @@ function DevActions.start()
 		return Nests.grab(player, index)
 	end)
 
+	-- Teleports beside a registered item (by id), then runs the real Grab prompt path.
+	DevHooks.register("grabItem", function(name: string, id: number, stayPut: boolean?)
+		local player = playerNamed(name)
+		local item = Carry.items()[id]
+		if not item then
+			return false, "noItem"
+		end
+		local character = player.Character
+		if character and not stayPut then
+			character:PivotTo(CFrame.new(item.model:GetPivot().Position + Vector3.new(3, 3, 0)))
+		end
+		return Carry.grab(player, item)
+	end)
+
 	DevHooks.register("drop", function(name: string)
 		return Carry.drop(playerNamed(name), "dev") ~= nil
 	end)
@@ -163,6 +197,80 @@ function DevActions.start()
 			character:PivotTo(CFrame.new(pad.Position + Plots.frame(target).LookVector * 3 + Vector3.new(0, 3, 0)))
 		end
 		return Vault.deposit(player, target)
+	end)
+
+	-- Teleports beside the player's first free porch pad (Showcase1 when full), then runs the real place path.
+	DevHooks.register("porch", function(name: string, stayPut: boolean?)
+		local player = playerNamed(name)
+		local state = PlayerState.get(player)
+		if not (state and state.plot) then
+			return false, "noPlot"
+		end
+		local slot = Slots.firstFree(state.showcase, Config.Showcase.slots) or 1
+		local pad = Plots.part(state.plot, `Showcase{slot}`)
+		local character = player.Character
+		if character and not stayPut then
+			character:PivotTo(CFrame.new(pad.Position + Plots.frame(state.plot).LookVector * -3 + Vector3.new(0, 3, 0)))
+		end
+		return Showcase.place(player, state.plot)
+	end)
+
+	-- Both move hooks teleport onto the player's porch first (the spawn point), unless `stayPut`.
+	local function goHome(player: Player, stayPut: boolean?)
+		local state = PlayerState.get(player)
+		if player.Character and state and state.plot and not stayPut then
+			player.Character:PivotTo(Plots.spawnCFrame(state.plot))
+		end
+	end
+	DevHooks.register("toVault", function(name: string, slot: number, stayPut: boolean?)
+		local player = playerNamed(name)
+		goHome(player, stayPut)
+		return Showcase.toVault(player, slot)
+	end)
+	DevHooks.register("toPorch", function(name: string, pad: number, stayPut: boolean?)
+		local player = playerNamed(name)
+		goHome(player, stayPut)
+		return Showcase.toPorch(player, pad)
+	end)
+
+	-- Teleports to the lawn 3 studs in front of the porch pad (`plotIndex` 0 = the practice house), then runs
+	-- the real steal path.
+	DevHooks.register("steal", function(name: string, plotIndex: number, slot: number?, stayPut: boolean?)
+		local player = playerNamed(name)
+		local character = player.Character
+		if plotIndex == 0 then
+			if character and not stayPut then
+				local pad = DummyBase.pad()
+				character:PivotTo(CFrame.new(pad.Position + DummyBase.frame().LookVector * 3 + Vector3.new(0, 3, 0)))
+			end
+			return DummyBase.steal(player)
+		end
+		if character and not stayPut then
+			local pad = Plots.part(plotIndex, `Showcase{slot or 1}`)
+			character:PivotTo(CFrame.new(pad.Position + Plots.frame(plotIndex).LookVector * 3 + Vector3.new(0, 3, 0)))
+		end
+		return Showcase.steal(player, plotIndex, slot or 1)
+	end)
+
+	-- Studio-only victim seam: robs porch `slot` with no thief. Runs the real Stolen effects, then leaves the
+	-- item loose on the lawn 6 studs in front of the porch (a burrito keeps its unwrap fraction).
+	DevHooks.register("robMe", function(name: string, slot: number)
+		local player = playerNamed(name)
+		local state = PlayerState.get(player)
+		local item = state and state.showcase[slot]
+		if not (state and state.plot and item and item.status == "showcase") then
+			return false, "empty"
+		end
+		local progress = if item.kind == "burrito" then Showcase.progressOf(item) else nil
+		Showcase.unseat(item)
+		item.progress = progress
+		Showcase.Stolen:Fire(nil, player, item)
+		local pad = Plots.part(state.plot, `Showcase{slot}`)
+		local spot = pad.Position + Plots.frame(state.plot).LookVector * 6
+		Carry.placeOnGround(item, spot.X, spot.Z)
+		Carry.setStatus(item, "loose")
+		item.looseAt = os.clock()
+		return true
 	end)
 
 	DevHooks.register("fillVault", function(name: string)

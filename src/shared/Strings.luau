@@ -28,6 +28,20 @@ Strings.Toasts = {
 	alreadyCarrying = "Your arms are already full of burrito.",
 	taken = "Someone got there first.",
 	unwrapping = "Unwrapping. Do not peek.",
+	porchFull = "The porch is full. Somebody has to sit in the Vault.",
+	yours = "That one's already yours. Stealing from yourself is just moving.",
+	immune = "This porch was just robbed. Give them a minute.",
+	dummyDone = "You already took the practice Chonk. The dummy is out of Chonks for you.",
+	awayFromHome = "Go home first. Chonks don't do long distance.",
+	stashed = "Stashed in the Vault. Safe and snug.",
+	onPorch = "On the porch. Everyone can see how round it is.",
+}
+
+Strings.Theft = {
+	stolen = "%s has been stolen. %s is not surprised.",
+	youStole = "You borrowed %s. Run!",
+	wentHome = "%s's owner went home. So did %s.",
+	cameBack = "%s wandered back home.",
 }
 
 Strings.Guardian = {
@@ -40,8 +54,20 @@ Strings.Prompts = {
 	grabObject = "Blanket Burrito",
 	pedal = "Pedal!",
 	wheelObject = "Hamster Wheel",
-	unwrap = "Unwrap",
 	incubatorObject = "Incubator",
+	vaultDeposit = "Put in Vault",
+	place = "Put here",
+	porchObject = "Porch",
+	steal = "Steal",
+	toVault = "To Vault",
+	toPorch = "To Porch",
+	chonkObject = "Chonk",
+}
+
+Strings.Showcase = {
+	raidCooldown = "Raid cooldown %s",
+	dummySign = "PRACTICE HOUSE: steal the Chonk, carry it home. Nobody minds.",
+	dummyHouse = "Practice House",
 }
 
 Strings.Reveal = {

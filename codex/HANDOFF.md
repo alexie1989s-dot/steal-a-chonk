@@ -1,6 +1,40 @@
 # Current handoff
 
-Updated: 2026-09-29 by Claude Code. The vertical-slice greybox prototype was built on 2026-09-24; the Showcase heist (Alpha step 1) was built on top of it on 2026-09-27; the presentation pass landed on 2026-09-29. The Codex art notes further down (2026-09-07) are history: art is paused during the prototype.
+Updated: 2026-09-30 by Claude Code. The vertical-slice greybox prototype was built on 2026-09-24; the Showcase heist (Alpha step 1) was built on top of it on 2026-09-27; the presentation pass landed on 2026-09-29. The Codex art notes further down (2026-09-07) are history: art is paused during the prototype.
+
+## 2026-09-30 Integrated into main (Claude Code)
+
+The heist and the presentation pass were committed as `9013474` and merged into `main` as
+`a19b496`; `898f279` then reworded the README. **`main` and `prototype/vertical-slice` now point
+at the same commit** and both are pushed, so a collaborator can clone and run without choosing a
+branch. The `README.md` add/add conflict was resolved by keeping the branch version and rewriting
+its front matter and Branches table.
+
+Added in the merge: a root `.gitattributes` pinning `*.luau`, `*.toml` and `*.json` to LF. StyLua
+is configured `line_endings = "Unix"` while `core.autocrlf` is true on Windows, so a fresh clone
+failed `stylua --check` on every file with a diff showing identical text on both sides. The README
+says how to fix an older clone. The local working tree was renormalised the same way.
+
+The README also gained the collaborator notes the user asked for: a read-this-in-this-order
+orientation section, how the pieces fit (server authority, why `src/shared` is pure and headlessly
+testable, the code-generated map, `Carry` as the one item registry) and a "things that will bite
+you" list (Rojo dropping `Position`, Rojo not live-applying project property changes, the Chonk
+geometry contract, scenery that must not collide).
+
+**Pre-push scan, reported as required:** 30 committed files, all text, no new binaries. No emails,
+credentials, tokens or Roblox asset ids. The 17 tracked binaries were checked including inflated
+PNG `tEXt`/`zTXt`/`iTXt` chunks and `corgi.blend` fully decompressed across every zstd frame
+(1.99 MB compressed, 6.14 MB raw; a single-frame read only reaches the first 67 KB, so read across
+frames or the check is worthless). Its 21 embedded paths all read `c:\Users\username\...`, the
+placeholder left by the earlier history scrub -- no real username.
+
+Deleted after the commit: the heist execution ledger at `.superpowers/sdd/2026-09-25-showcase-heist/`.
+
+Still excluded from Git on purpose: `assets/tools/start_blender_mcp.py` (modified) and the untracked
+Blender corgi redesign set. Those remain the user's set-aside experiment.
+
+**Next step:** unchanged -- the testers run the two-player checklist and judge the feel, the devs
+rule on the heist proposals, and someone needs to rule on where game audio comes from.
 
 ## 2026-09-29 Presentation pass (Claude Code)
 

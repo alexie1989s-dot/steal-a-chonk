@@ -2,7 +2,7 @@
 
 An original Roblox steal game about enormous, round, sleepy animals called **Chonks**. Sneak into the field, grab a blanket burrito from a guarded nest, outrun the grumpy Mama Chonk back to your house, and unwrap whatever was inside. Train your **Zoomies** on the hamster wheel to run faster and reach farther zones. Built mobile-first, with affectionate humour.
 
-> **You are on `main`.** The playable prototype was merged here on 30 Sep 2026, so this branch now has the game code, the design and the art history in one place. `prototype/vertical-slice` is kept as the branch the work was built on.
+> **Everything lives on `main`.** The playable prototype was merged there on 30 Sep 2026, so the game code, the design and the art history are all in one place. `prototype/vertical-slice` is the branch it was built on and now points at the same commit, so whichever of the two you have checked out, you are not missing anything.
 
 ## Where we are (updated 30 Sep 2026)
 
@@ -102,8 +102,8 @@ The one thing that could not be done this way is **sound**, and the game is comp
 
 | Branch | What's on it |
 | --- | --- |
-| `main` (this one) | Everything: the playable prototype, the design spec, the tests, the shared notes, the concept art and the old art experiments. Start here. |
-| `prototype/vertical-slice` | The branch the prototype was built on, merged into `main` on 30 Sep 2026. Kept so the build history stays readable; nothing is on it that isn't on `main`. |
+| `main` | Everything: the playable prototype, the design spec, the tests, the shared notes, the concept art and the old art experiments. **Start here.** |
+| `prototype/vertical-slice` | The branch the prototype was built on. Merged into `main` on 30 Sep 2026 and kept at the same commit, so the build history stays readable. Nothing is on it that isn't on `main`. |
 
 ## What's where
 

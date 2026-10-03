@@ -1,6 +1,52 @@
 # Current handoff
 
-Updated: 2026-10-01 by Claude Code. The vertical-slice greybox prototype was built on 2026-09-24; the Showcase heist (Alpha step 1) was built on top of it on 2026-09-27; the presentation pass landed on 2026-09-29. The Codex art notes further down (2026-09-07) are history: art is paused during the prototype.
+Updated: 2026-10-04 by Claude Code. The vertical-slice greybox prototype was built on 2026-09-24; the Showcase heist (Alpha step 1) was built on top of it on 2026-09-27; the presentation pass landed on 2026-09-29. The Codex art notes further down (2026-09-07) are history: art is paused during the prototype.
+
+## 2026-10-04 Name tags thinned; the unwrap card rebuilt (Claude Code)
+
+The user asked for four things: commit and push, thin the name tags, polish the unwrap card, and
+publish an unlisted place. The 2026-10-01 work below was committed as `caea2cb` and pushed to
+`main` and `prototype/vertical-slice`. Before the commit a scan of the added lines found no machine
+paths, usernames, emails, tokens or asset ids, and no binaries. Two comments that had drifted were
+put back above the code they describe, and two lighting numbers in the 10-01 table below were
+corrected to match the shipped `default.project.json`.
+
+**Name tags no longer stack.** New pure `Shared.Declutter.choose` with 6 Lune tests, plus the
+client `NameTags` module. Every 0.1 s it projects each `NameTag` BillboardGui to the screen and
+keeps the nearest. A tag that would overlap one already kept fades out in 0.15 s. A hidden tag
+blocks nothing, and a 6-pixel hysteresis stops a slow orbit from flickering tags at the edge.
+Tags out of range or behind the camera drop at once and come back through the same clear-spot
+check. The server still creates every tag and never toggles one, so the client's changes are
+purely local.
+
+- Verified in Studio with a full Vault (`.claude/tools/studio/tags_check.luau`, Client context,
+  which holds the camera in the plot). Looking straight down the rows: 5 tags in range, 0 overlaps,
+  all 5 shown. From an angled view: **8 in range with 6 overlapping pairs, of which 4 were shown
+  with 0 overlaps.** From a raised view: 10 in range, 1 overlap, 9 shown. Sampled at 75 ms
+  for 3 s: 0 state flips. A screenshot from the angled view shows three clean plates.
+
+**The unwrap card was rebuilt** (`src/client/Reveal.luau`) in the HUD's style, still using only
+plain GUI instances and no assets. It has a tier ribbon, a gradient panel with a tier-coloured
+rim, a sunburst of 12 rays in the tier colour behind it, a size stamp that lands a beat after the
+card, the income on its own gold plate, and a pulsing "Tap to continue". **The card shows the
+Chonk itself:** the server now sends the model with the payload
+(`Reveal:FireClient(player, card, model)` from `Vault` and `Showcase`, both already parented in
+the workspace). The client clones it into a `ViewportFrame` with its prompts, tags, lights and
+CollectionService tags stripped, so the idle bob does not adopt the copy, and sways it on a
+turntable. If the model is missing the card still works. A serial stops a delayed stamp from a
+dismissed card landing on the next one.
+
+- Verified in Studio: a porch reveal (Rare Sir Noodle) and a Vault incubator reveal (Common Gary)
+  both showed the right tier, name, species, bio and income, with the model in the portrait and
+  0 tags on the copy. Clicking Dismiss through `user_mouse_input` closed the card and cleared the
+  portrait. The console showed no errors or warnings. The size-6 shake was not seen, because no
+  roll came up 6; its code path is unchanged apart from the stamp's resting angle.
+
+**Checks:** 83 Lune tests, `stylua --check src tests`, `selene src` and `rojo build` all pass.
+
+**Next step:** publish the place privately so the mates can play it in the real client. That
+needs the user's own clicks in Studio's publish dialog and the experience's access settings. It
+is also the only way to settle the render question from 2026-10-01.
 
 ## 2026-10-01 Render pop-in investigated; the idle bob was broken (Claude Code)
 

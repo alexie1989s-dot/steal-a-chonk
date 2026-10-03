@@ -551,7 +551,7 @@ local function reveal(item: Item)
 	state.nextUid += 1
 	local chonk = chonkItem(seat.owner, rec)
 	seatItem(seat.owner, seat.plot, seat.slot, chonk)
-	Remotes.get("Reveal"):FireClient(seat.owner, porchCard(chonk))
+	Remotes.get("Reveal"):FireClient(seat.owner, porchCard(chonk), chonk.model)
 end
 
 -- The raid-cooldown sign above a porch, counting down while its owner is immune.

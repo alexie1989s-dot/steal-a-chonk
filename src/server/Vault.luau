@@ -154,7 +154,9 @@ local function reveal(player: Player, slot: number, incubation: Incubation)
 	Carry.forget(incubation.burrito)
 	placeDisplay(player, record, pad)
 	PlayerState.sync(player)
-	Remotes.get("Reveal"):FireClient(player, VaultRules.revealCard(record))
+	-- The display model goes along so the card can show the Chonk itself; it is already in the
+	-- workspace, so it has replicated by the time the event arrives.
+	Remotes.get("Reveal"):FireClient(player, VaultRules.revealCard(record), displays[player][pad])
 end
 
 -- Deposit path shared by the incubator prompts and DevHooks. `plotIndex` is where the player stands.

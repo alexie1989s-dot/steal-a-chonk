@@ -4,12 +4,14 @@ An original Roblox steal game about enormous, round, sleepy animals called **Cho
 
 > **Everything lives on `main`.** The playable prototype was merged there on 30 Sep 2026, so the game code, the design and the art history are all in one place. `prototype/vertical-slice` is the branch it was built on and now points at the same commit, so whichever of the two you have checked out, you are not missing anything.
 
-## Where we are (updated 30 Sep 2026)
+## Where we are (updated 4 Oct 2026)
 
 - **Playable:** a greybox *vertical slice* with one zone, one kind of guardian, ten Chonks, your Vault, the hamster wheel, carrying, the bat and the reveal card.
 - **The Showcase heist**, the first Alpha feature. Your porch has two Showcase slots, you can steal from other players' porches, and a Practice House near the middle lets you learn stealing for free ([details below](#the-showcase-heist-new)).
-- **New: it now looks like a game.** A presentation pass on 29 Sep gave it proper lighting and sky, ten Chonks you can tell apart at a glance, houses with roofs and porches, a field with trees and flowers, a much better HUD, and a gentle idle bob on Chonks sitting on a pad. **It is all still placeholder**, built from Studio's own bricks and spheres ([more below](#art)).
-- **Checked:** 74 automated tests of the game rules pass. Solo playtests in Studio ran the whole loop end to end, including stealing the practice Chonk, stashing it, and unwrapping on the porch, with real key presses.
+- **It looks like a game now.** Two presentation passes (29 Sep and 1 Oct) gave it bright, saturated lighting, ten Chonks you can tell apart at a glance, a different colour for every house, a warm sand plaza, a field with trees and flowers, a much better HUD, and a gentle idle bob on Chonks sitting on a pad. The map is closed in by wooded hills with an invisible wall at the edge, the camera zoom stays in a sensible range, and Chonks no longer clip into each other or the walls. **It is all still placeholder**, built from Studio's own bricks and spheres ([more below](#art)).
+- **New on 4 Oct:** the unwrap card now shows the Chonk you got, turning on the card, behind a burst in its rarity colour. Name tags no longer pile up on top of each other: when two would overlap, the nearer one stays and the one behind it fades out until it has room.
+- **One trade-off we made:** so ten Chonks fit in a Vault, the biggest size is now only a bit bigger than the smallest. It is easy to undo if the size feels too tame.
+- **Checked:** 83 automated tests of the game rules pass. Solo playtests in Studio ran the whole loop end to end, including stealing the practice Chonk, stashing it, and unwrapping on the porch, with real key presses.
 - **Not checked yet:** two players at once (so real porch theft between people), phones and touch controls, performance. Nothing is saved between sessions yet.
 - **There is no sound at all.** That is the biggest thing still missing, and we need to agree where audio comes from before it can be added ([below](#art)).
 - **Merged into `main` on 30 Sep 2026.** Everything is on one branch now.
@@ -80,7 +82,7 @@ A few rules the design doesn't settle are proposals for us to decide, in the pla
 3. **Feel.** Is the chase fun? A brand-new player is slower than the Mama Chonk and has to grab while she is on the far side of her loop. Even with ~160 Zoomies she caught one of our grabs. Is stealing fun, and is 1.5 s the right hold?
 4. **Numbers and names.** Every value the design left open is a proposal in the decisions tables of the [slice plan](docs/superpowers/plans/2026-09-24-vertical-slice-prototype.md#prototype-decisions-the-spec-does-not-settle-proposals-tune-or-overrule-freely) and the [heist plan](docs/superpowers/plans/2026-09-25-showcase-heist.md#prototype-decisions-the-spec-does-not-settle-proposals-tune-or-overrule-freely). The numbers live in [`Config.luau`](src/shared/Config.luau). Chonk names, bios and pop-up text are draft copy in [`Catalog.luau`](src/shared/Catalog.luau) and [`Strings.luau`](src/shared/Strings.luau). Change or overrule anything.
 5. **A phone**, if you can. The touch buttons exist but haven't been tried on a real device.
-6. **How it looks.** Can you tell the ten Chonks apart without reading the name tags? Is the base readable when you walk in with a full Vault? Anything that looks wrong, cheap or confusing — say so, it is all placeholder and cheap to change.
+6. **How it looks.** Can you tell the ten Chonks apart without reading the name tags? Is the base readable when you walk in with a full Vault, and can you still read the tags? Does unwrapping a Chonk feel like a moment? Anything that looks wrong, cheap or confusing — say so, it is all placeholder and cheap to change.
 
 ## What's next
 
@@ -113,7 +115,7 @@ The one thing that could not be done this way is **sound**, and the game is comp
 | [`docs/superpowers/plans/`](docs/superpowers/plans/) | Build plans: the vertical slice and the Showcase heist (both built). |
 | [`src/shared/`](src/shared/) | Game rules, all the numbers, the Chonk catalog and all the text. |
 | [`src/server/`](src/server/) | The server: world, nests, guardians, carrying, Vault, porch Showcase, Practice House, wheel, bat. |
-| [`src/client/`](src/client/) | The HUD, reveal card, camera, effects, input, the prompt filter and the idle bob on displayed Chonks. |
+| [`src/client/`](src/client/) | The HUD, reveal card, camera, effects, input, the prompt filter, the idle bob on displayed Chonks and the name-tag thinning. |
 | [`tests/`](tests/) | Automated tests for the rules in `src/shared/`. |
 | [`codex/HANDOFF.md`](codex/HANDOFF.md) | Detailed latest status: what was verified, what's outstanding, what's next. |
 | [`codex/PROJECT_CONTEXT.md`](codex/PROJECT_CONTEXT.md) | Decisions, their history and the open design questions. |

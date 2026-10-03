@@ -76,6 +76,12 @@ local suites: { { name: string, load: () -> () } } = {
 			require("./ShowcaseRules.spec")
 		end,
 	},
+	{
+		name = "Declutter",
+		load = function()
+			require("./Declutter.spec")
+		end,
+	},
 }
 
 local loadFailures = {}

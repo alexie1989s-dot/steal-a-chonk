@@ -6,7 +6,7 @@ local RunService = game:GetService("RunService")
 local Remotes = {}
 
 -- BatSwing: client → server, no arguments.
--- Reveal: server → client, card payload table.
+-- Reveal: server → client, (card payload table, the Chonk's model or nil).
 -- Toast: server → client, (text).
 -- Knockback: server → client, (dirX, dirZ).
 -- Celebrate: server → client, no arguments.

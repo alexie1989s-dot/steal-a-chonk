@@ -97,6 +97,15 @@ function DevActions.start()
 		return true
 	end)
 
+	-- Studio only: lifts the camera zoom limits so the whole map can be inspected from above.
+	DevHooks.register("freeCamera", function(on: boolean)
+		Config.Debug.freeCamera = on and true or false
+		for _, player in Players:GetPlayers() do
+			Movement.applyZoomLimits(player)
+		end
+		return Config.Debug.freeCamera
+	end)
+
 	DevActions.addStateSection("nests", function()
 		local list = {}
 		for _, nest in Nests.all() do
@@ -206,7 +215,7 @@ function DevActions.start()
 		if not (state and state.plot) then
 			return false, "noPlot"
 		end
-		local slot = Slots.firstFree(state.showcase, Config.Showcase.slots) or 1
+		local slot = Slots.firstFree(state.showcase, Showcase.slots()) or 1
 		local pad = Plots.part(state.plot, `Showcase{slot}`)
 		local character = player.Character
 		if character and not stayPut then
@@ -273,8 +282,8 @@ function DevActions.start()
 		return true
 	end)
 
-	DevHooks.register("fillVault", function(name: string)
-		Vault.fill(playerNamed(name))
+	DevHooks.register("fillVault", function(name: string, size: number?)
+		Vault.fill(playerNamed(name), size)
 		return true
 	end)
 end

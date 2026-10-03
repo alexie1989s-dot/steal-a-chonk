@@ -85,8 +85,20 @@ local function placeDisplay(player: Player, record: PlayerState.ChonkRecord, pad
 	displays[player][pad] = model
 end
 
+-- The display pad a record would land on, or nil when every pad is taken. Callers check this before
+-- they let go of an item: `addRecord` cannot refuse once the item has been taken and forgotten, and
+-- nothing a player owns may be deleted (spec pillar: nothing owned is lost except by choice).
+function Vault.freePad(player: Player): number?
+	local state = PlayerState.get(player)
+	if not state then
+		return nil
+	end
+	return Slots.firstFree(state.vault, Config.Vault.displaySlots)
+end
+
 -- Puts a record on the first free display pad and shows it. Callers check room first
--- (VaultRules.hasRoom / canStash / ShowcaseRules.canMoveToVault). Returns the pad, or nil when full.
+-- (Vault.freePad / VaultRules.hasRoom / canStash / ShowcaseRules.canMoveToVault).
+-- Returns the pad, or nil when full.
 function Vault.addRecord(player: Player, record: PlayerState.ChonkRecord): number?
 	local state = PlayerState.get(player)
 	if not state then
@@ -184,6 +196,11 @@ function Vault.deposit(player: Player, plotIndex: number): (boolean, string?)
 			toast(player, reason :: string)
 			return false, reason
 		end
+		-- Checked before the Chonk leaves the player's hands: nothing below yields, so the pad is still free.
+		if not Vault.freePad(player) then
+			toast(player, "vaultFull")
+			return false, "vaultFull"
+		end
 		local item = Carry.take(player) :: Carry.Item
 		Carry.adopt(player, item)
 		Vault.addRecord(
@@ -222,6 +239,8 @@ function Vault.startIncubation(player: Player, slot: number, burrito: Carry.Item
 	Carry.setStatus(burrito, "incubating")
 	local pad = Plots.part(state.plot :: number, `Incubator{slot}`)
 	burrito.model:PivotTo(CFrame.new(pad.Position + Vector3.new(0, 2.2, 0)))
+	-- A stolen burrito arrives parented wherever it was carried from, so move it under this plot.
+	burrito.model.Parent = Plots.model(state.plot :: number)
 	state.incubators[slot] = {
 		burrito = burrito,
 		startedAt = os.clock(),
@@ -230,7 +249,8 @@ function Vault.startIncubation(player: Player, slot: number, burrito: Carry.Item
 	}
 end
 
-function Vault.fill(player: Player)
+-- `size` is for Studio checks: filling with the largest size is how pad spacing gets tested.
+function Vault.fill(player: Player, size: number?)
 	local state = PlayerState.get(player)
 	if not state then
 		return
@@ -238,7 +258,7 @@ function Vault.fill(player: Player)
 	-- Leave room for burritos already incubating: they each need a display pad when they hatch.
 	while VaultRules.hasRoom(Slots.count(state.vault), incubatingCount(state)) do
 		local pad = Slots.firstFree(state.vault, Config.Vault.displaySlots) :: number
-		local record = { uid = state.nextUid, chonkId = "cat_beans", tier = "Common", size = 1 }
+		local record = { uid = state.nextUid, chonkId = "cat_beans", tier = "Common", size = size or 1 }
 		state.nextUid += 1
 		state.vault[pad] = record
 		placeDisplay(player, record, pad)

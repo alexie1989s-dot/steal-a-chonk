@@ -9,7 +9,9 @@
 --   * -Z is the face. Plots orient a plot frame with its LookVector pointing outward, so a
 --     Chonk placed with that rotation looks out over the curb at whoever is coming for it.
 -- Every decoration is CanCollide false and welded to the body, so a model survives Carry
--- unanchoring it.
+-- unanchoring it. The body is CanCollide false too: a seated Chonk must never block a player on
+-- their own porch, and Carry turns collision off anyway when it lifts one, so leaving it on made a
+-- fresh Chonk solid and a once-carried one not.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
@@ -86,6 +88,7 @@ local function newChonk(color: Color3, d: number, wide: number, deep: number): C
 		Size = size,
 		Color = color,
 		Material = Enum.Material.SmoothPlastic,
+		CanCollide = false,
 		Parent = model,
 	})
 	model.PrimaryPart = body
@@ -244,6 +247,8 @@ end
 
 -- Per-species silhouettes. Each gets the same round base, then the two or three cues that
 -- make it read as that animal at a glance on a phone screen.
+-- `wide` must stay at or under Config.WidestBodyProfile: the Vault pad spacing is checked against
+-- it, and a wider Chonk would overlap its neighbour on the display.
 local SPECIES: { [string]: { wide: number, deep: number, build: (Chonk) -> () } } = {
 	Cat = {
 		wide = 1.06,
@@ -620,6 +625,28 @@ function Models.burrito(tier: string, size: number): Model
 	return model
 end
 
+-- The house style for world text: a dark rounded plate with an accent rim. Floating outlined text
+-- vanished against bright grass, a pale wall or the sky, depending on where the player stood; a
+-- plate reads the same from every angle, which is what the genre does with every world label.
+function Models.pill(gui: GuiObject, accent: Color3, radius: number?)
+	gui.BackgroundColor3 = Color3.fromRGB(26, 22, 38)
+	gui.BackgroundTransparency = 0.18
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, radius or 12)
+	corner.Parent = gui
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = accent
+	stroke.Thickness = 2
+	stroke.Transparency = 0.35
+	stroke.Parent = gui
+	local pad = Instance.new("UIPadding")
+	pad.PaddingLeft = UDim.new(0, 10)
+	pad.PaddingRight = UDim.new(0, 10)
+	pad.PaddingTop = UDim.new(0, 4)
+	pad.PaddingBottom = UDim.new(0, 4)
+	pad.Parent = gui
+end
+
 -- A floating countdown above an incubator or porch pad. Destroy its BillboardGui (label.Parent) when done.
 function Models.progressLabel(parent: BasePart): TextLabel
 	local gui = Instance.new("BillboardGui")
@@ -656,24 +683,19 @@ end
 function Models.nameLabel(model: Model, text: string, color: Color3, offsetY: number, maxDistance: number?): TextLabel
 	local gui = Instance.new("BillboardGui")
 	gui.Name = "NameTag"
-	gui.Size = UDim2.fromOffset(210, 54)
+	gui.Size = UDim2.fromOffset(232, 64)
 	gui.StudsOffset = Vector3.new(0, offsetY, 0)
 	gui.MaxDistance = maxDistance or 80
 	gui.Parent = model.PrimaryPart
 	local label = Instance.new("TextLabel")
 	label.Size = UDim2.fromScale(1, 1)
-	label.BackgroundTransparency = 1
 	label.Font = Enum.Font.FredokaOne
 	label.TextScaled = true
 	label.TextColor3 = color
 	label.Text = text
 	label.Parent = gui
-	-- A dark outline keeps the tag legible against a bright sky or a pale Chonk.
-	local stroke = Instance.new("UIStroke")
-	stroke.Color = Color3.fromRGB(26, 22, 36)
-	stroke.Thickness = 2.5
-	stroke.Transparency = 0.1
-	stroke.Parent = label
+	-- Rimmed in the tier colour, so rarity reads from across the district.
+	Models.pill(label, color)
 	return label
 end
 

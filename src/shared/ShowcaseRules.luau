@@ -8,10 +8,17 @@ local VaultRules = require("./VaultRules")
 
 local ShowcaseRules = {}
 
+-- The porch slots a plot can actually use: never more than the pads that were built for it.
+-- Spec 10 grows the porch to 8 slots, so Config may ask for more than the prototype builds.
+function ShowcaseRules.usableSlots(configured: number, built: number): number
+	return math.max(math.min(configured, built), 0)
+end
+
 export type PlaceContext = {
 	carrying: string?, -- the carried item's kind, nil when empty-handed
 	atOwnPlot: boolean,
 	slots: { [number]: any }, -- porch slot -> occupant
+	capacity: number, -- usable slots, from ShowcaseRules.usableSlots
 }
 
 -- Returns (true, slot) or (false, reason).
@@ -22,7 +29,7 @@ function ShowcaseRules.canPlace(ctx: PlaceContext): (boolean, any)
 	if not ctx.atOwnPlot then
 		return false, "notYourBase"
 	end
-	local slot = Slots.firstFree(ctx.slots, Config.Showcase.slots)
+	local slot = Slots.firstFree(ctx.slots, ctx.capacity)
 	if not slot then
 		return false, "porchFull"
 	end

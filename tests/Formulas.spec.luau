@@ -56,6 +56,16 @@ T.test("model scale grows with size", function()
 	T.expectTrue(Formulas.sizeScale(6) > Formulas.sizeScale(5))
 end)
 
+T.test("the biggest Chonk fits between the Vault display pads", function()
+	-- Ten max-size Chonks used to interpenetrate by 2 studs on the pads. The body is
+	-- `4 * sizeScale` across its short axis and `* WidestBodyProfile` across its widest, and the
+	-- pads are a fixed distance apart, so this is the relationship that has to hold.
+	local widest = 4 * Formulas.sizeScale(6) * Config.WidestBodyProfile
+	local gap = Config.Vault.displaySpacing
+	T.expectTrue(widest < gap.x)
+	T.expectTrue(widest < gap.z)
+end)
+
 T.test("sizes outside 1..6 clamp instead of erroring", function()
 	T.expectNear(Formulas.incomePerSecond("Common", 9), 12, 1e-9)
 	T.expectNear(Formulas.incomePerSecond("Common", 0), 1, 1e-9)

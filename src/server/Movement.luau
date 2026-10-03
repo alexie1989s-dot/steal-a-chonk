@@ -59,6 +59,17 @@ local function checkCarriers()
 	end
 end
 
+-- Camera zoom is a Player property, so the server sets it and it replicates. StarterPlayer seeds
+-- those two properties when a player joins, which overwrote a value set at PlayerState.Added, so
+-- this is applied again once the character exists. Re-applied whenever the debug flag is toggled,
+-- because the limits are read at that moment, not watched.
+function Movement.applyZoomLimits(player: Player)
+	local cam = Config.Camera
+	local free = Config.Debug.freeCamera
+	player.CameraMinZoomDistance = if free then cam.debugMinZoom else cam.minZoom
+	player.CameraMaxZoomDistance = if free then cam.debugMaxZoom else cam.maxZoom
+end
+
 function Movement.start()
 	PlayerState.Removing:Connect(function(player: Player)
 		lastSample[player] = nil
@@ -71,11 +82,14 @@ function Movement.start()
 	end)
 
 	PlayerState.Added:Connect(function(player: Player)
+		Movement.applyZoomLimits(player)
 		player.CharacterAdded:Connect(function(character)
 			character:WaitForChild("Humanoid", 5)
+			Movement.applyZoomLimits(player)
 			Movement.refresh(player)
 		end)
 		if player.Character then
+			Movement.applyZoomLimits(player)
 			Movement.refresh(player)
 		end
 	end)

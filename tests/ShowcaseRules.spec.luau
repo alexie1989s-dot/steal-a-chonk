@@ -35,12 +35,17 @@ T.test("immunity ends exactly at immuneUntil", function()
 	T.expectEqual(ShowcaseRules.canSteal(steal({ now = 220, immuneUntil = 220 })), true)
 end)
 
+local function place(overrides)
+	local c = { carrying = "burrito", atOwnPlot = true, slots = {}, capacity = Config.Showcase.slots }
+	for k, v in overrides or {} do
+		c[k] = v
+	end
+	return c
+end
+
 T.test("placing on your porch takes the first free slot", function()
-	T.expectEqual(select(2, ShowcaseRules.canPlace({ carrying = "burrito", atOwnPlot = true, slots = {} })), 1)
-	T.expectEqual(
-		select(2, ShowcaseRules.canPlace({ carrying = "chonk", atOwnPlot = true, slots = { [1] = true } })),
-		2
-	)
+	T.expectEqual(select(2, ShowcaseRules.canPlace(place())), 1)
+	T.expectEqual(select(2, ShowcaseRules.canPlace(place({ carrying = "chonk", slots = { [1] = true } }))), 2)
 end)
 
 T.test("placing refusals", function()
@@ -48,15 +53,24 @@ T.test("placing refusals", function()
 	for slot = 1, Config.Showcase.slots do
 		full[slot] = true
 	end
-	T.expectEqual(select(2, ShowcaseRules.canPlace({ carrying = nil, atOwnPlot = true, slots = {} })), "notCarrying")
-	T.expectEqual(
-		select(2, ShowcaseRules.canPlace({ carrying = "burrito", atOwnPlot = false, slots = {} })),
-		"notYourBase"
-	)
-	T.expectEqual(
-		select(2, ShowcaseRules.canPlace({ carrying = "burrito", atOwnPlot = true, slots = full })),
-		"porchFull"
-	)
+	local empty = place()
+	empty.carrying = nil -- a nil in an override table is no override at all
+	T.expectEqual(select(2, ShowcaseRules.canPlace(empty)), "notCarrying")
+	T.expectEqual(select(2, ShowcaseRules.canPlace(place({ atOwnPlot = false }))), "notYourBase")
+	T.expectEqual(select(2, ShowcaseRules.canPlace(place({ slots = full }))), "porchFull")
+end)
+
+T.test("placing never offers a slot past the capacity it was given", function()
+	-- The porch has as many slots as the plot has pads, which can be fewer than Config asks for.
+	T.expectEqual(select(2, ShowcaseRules.canPlace(place({ capacity = 1, slots = { [1] = true } }))), "porchFull")
+	T.expectEqual(select(2, ShowcaseRules.canPlace(place({ capacity = 0 }))), "porchFull")
+end)
+
+T.test("the usable porch is the smaller of the configured slots and the pads that were built", function()
+	T.expectEqual(ShowcaseRules.usableSlots(2, 2), 2)
+	T.expectEqual(ShowcaseRules.usableSlots(8, 2), 2) -- spec 10 grows the porch to 8; the pads are a later plan
+	T.expectEqual(ShowcaseRules.usableSlots(1, 2), 1) -- a smaller config still wins
+	T.expectEqual(ShowcaseRules.usableSlots(-3, 2), 0)
 end)
 
 T.test("a second dummy Chonk cannot be kept", function()

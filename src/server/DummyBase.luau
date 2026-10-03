@@ -34,6 +34,19 @@ local function toast(player: Player, key: string)
 	end
 end
 
+-- One step of the respawn loop, isolated: a single bad item must not stop the practice house for the session.
+local reported: { [string]: true } = {} -- each distinct fault is warned about once, not four times a second
+local function guarded(what: string, fn: (...any) -> ...any, ...)
+	local ok, err = pcall(fn, ...)
+	if not ok then
+		local line = `[DummyBase] {what} failed: {err}`
+		if not reported[line] then
+			reported[line] = true
+			warn(`{line} (reported once)`)
+		end
+	end
+end
+
 local function build(parent: Instance)
 	-- Local -Z faces the district centre (the porch side), as on the player plots.
 	local origin = Vector3.new(Config.DummyBase.x, 0, Config.DummyBase.z)
@@ -51,11 +64,13 @@ local function build(parent: Instance)
 		Material = Enum.Material.WoodPlanks,
 		Parent = house,
 	})
+	-- Tall enough to clear the largest Chonk the porch can hold: the pad top is 1.3 and a max-size
+	-- body is 4 * 2.1 studs, so anything under 10 studs of headroom puts its head through the roof.
 	for _, wall in
 		{
-			{ Vector3.new(0, 4, 6.5), Vector3.new(16, 7, 1) },
-			{ Vector3.new(-7.5, 4, 2.5), Vector3.new(1, 7, 9) },
-			{ Vector3.new(7.5, 4, 2.5), Vector3.new(1, 7, 9) },
+			{ Vector3.new(0, 5.5, 6.5), Vector3.new(16, 10, 1) },
+			{ Vector3.new(-7.5, 5.5, 2.5), Vector3.new(1, 10, 9) },
+			{ Vector3.new(7.5, 5.5, 2.5), Vector3.new(1, 10, 9) },
 		}
 	do
 		Models.part({
@@ -69,7 +84,7 @@ local function build(parent: Instance)
 	Models.part({
 		Name = "Roof",
 		Size = Vector3.new(18, 1, 11),
-		CFrame = at(Vector3.new(0, 8, 2.5)),
+		CFrame = at(Vector3.new(0, 11, 2.5)),
 		Color = Color3.fromRGB(120, 130, 170),
 		Parent = house,
 	})
@@ -86,38 +101,42 @@ local function build(parent: Instance)
 	local sign = Models.part({
 		Name = "DummySign",
 		Size = Vector3.one,
-		CFrame = at(Vector3.new(0, 12, 0)),
+		CFrame = at(Vector3.new(0, 15, 0)),
 		Transparency = 1,
 		CanCollide = false,
 		CanQuery = false,
 		Parent = house,
 	})
 	local gui = Instance.new("BillboardGui")
-	gui.Size = UDim2.fromOffset(300, 90)
+	gui.Size = UDim2.fromOffset(320, 104)
 	gui.MaxDistance = 200
 	gui.Parent = sign
+	-- One plate holding both lines, so the sign reads as a sign rather than as text in mid air.
+	local plate = Instance.new("Frame")
+	plate.Name = "Plate"
+	plate.Size = UDim2.fromScale(1, 1)
+	plate.Parent = gui
+	Models.pill(plate, Color3.fromRGB(255, 214, 64), 14)
 	local title = Instance.new("TextLabel")
 	title.Name = "Title"
-	title.Size = UDim2.fromScale(1, 0.45)
+	title.Size = UDim2.fromScale(1, 0.42)
 	title.BackgroundTransparency = 1
 	title.Font = Enum.Font.FredokaOne
 	title.TextScaled = true
-	title.TextColor3 = Color3.new(1, 1, 1)
-	title.TextStrokeTransparency = 0.4
+	title.TextColor3 = Color3.fromRGB(255, 214, 64)
 	title.Text = Strings.Showcase.dummyHouse
-	title.Parent = gui
+	title.Parent = plate
 	local body = Instance.new("TextLabel")
 	body.Name = "Text"
-	body.Position = UDim2.fromScale(0, 0.45)
-	body.Size = UDim2.fromScale(1, 0.55)
+	body.Position = UDim2.fromScale(0, 0.42)
+	body.Size = UDim2.fromScale(1, 0.58)
 	body.BackgroundTransparency = 1
 	body.Font = Enum.Font.FredokaOne
 	body.TextScaled = true
 	body.TextWrapped = true
-	body.TextColor3 = Color3.fromRGB(255, 240, 200)
-	body.TextStrokeTransparency = 0.4
+	body.TextColor3 = Color3.new(1, 1, 1)
 	body.Text = Strings.Showcase.dummySign
-	body.Parent = gui
+	body.Parent = plate
 
 	house.Parent = parent
 end
@@ -240,11 +259,14 @@ function DummyBase.start()
 					and item.looseAt
 					and now - item.looseAt >= Config.Nest.looseReturnSeconds * scale
 				then
-					DummyBase.reseat(item)
+					guarded("reseat", DummyBase.reseat, item)
 				end
 			end
 			if current == nil and respawnAt and now >= respawnAt then
-				spawnChonk()
+				-- Pushed forward first: a build that fails waits a full interval instead of retrying
+				-- every tick. `seat` clears it on success.
+				respawnAt = now + Config.DummyBase.respawnSeconds * scale
+				guarded("respawn", spawnChonk)
 			end
 		end
 	end)

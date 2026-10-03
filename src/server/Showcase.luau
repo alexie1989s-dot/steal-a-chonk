@@ -38,6 +38,9 @@ local Showcase = {
 
 local seats: { [Item]: Seat } = {}
 local alarms: { [number]: number } = {} -- plot -> token of the alarm currently blinking
+-- Never reused, so an alarm cancelled by its owner leaving cannot be mistaken for the next one on
+-- that plot: a restarted count would hand the new alarm a token an older thread still believes is its own.
+local nextAlarmToken = 1
 
 local ALARM_RED = Color3.fromRGB(255, 40, 40)
 local ALARM_DARK = Color3.fromRGB(130, 10, 10)
@@ -49,8 +52,27 @@ local function toast(player: Player, key: string)
 	end
 end
 
+-- One step of a background loop, isolated: a single bad item must not stop the loop for the session.
+local reported: { [string]: true } = {} -- each distinct fault is warned about once, not four times a second
+local function guarded(what: string, fn: (...any) -> ...any, ...)
+	local ok, err = pcall(fn, ...)
+	if not ok then
+		local line = `[Showcase] {what} failed: {err}`
+		if not reported[line] then
+			reported[line] = true
+			warn(`{line} (reported once)`)
+		end
+	end
+end
+
 local function padOf(plotIndex: number, slot: number): BasePart
 	return Plots.part(plotIndex, `Showcase{slot}`)
+end
+
+-- Porch slots a plot can really use. Config.Showcase.slots is the design number (§10 grows it to 8);
+-- the pads Plots builds are the limit, and asking for more used to error at boot on `Showcase3`.
+function Showcase.slots(): number
+	return ShowcaseRules.usableSlots(Config.Showcase.slots, Plots.showcasePads())
 end
 
 -- The "Put here" prompt exists only on empty pads; audience prompts are created and destroyed, never toggled.
@@ -245,7 +267,7 @@ local function nearPorch(player: Player, plotIndex: number): boolean
 		return false
 	end
 	local reach = Config.Showcase.placeDistance + Config.AntiCheat.reachTolerance
-	for slot = 1, Config.Showcase.slots do
+	for slot = 1, Showcase.slots() do
 		if (root.Position - padOf(plotIndex, slot).Position).Magnitude <= reach then
 			return true
 		end
@@ -273,13 +295,14 @@ function Showcase.place(player: Player, plotIndex: number, preferred: number?): 
 		carrying = if state.carrying then state.carrying.kind else nil,
 		atOwnPlot = state.plot ~= nil and state.plot == plotIndex,
 		slots = state.showcase,
+		capacity = Showcase.slots(),
 	})
 	if not ok then
 		toast(player, result)
 		return false, result
 	end
 	local slot = result :: number
-	if preferred and preferred >= 1 and preferred <= Config.Showcase.slots and state.showcase[preferred] == nil then
+	if preferred and preferred >= 1 and preferred <= Showcase.slots() and state.showcase[preferred] == nil then
 		slot = preferred
 	end
 	local item = Carry.take(player)
@@ -312,6 +335,12 @@ function Showcase.toVault(player: Player, slot: number): (boolean, any)
 		toast(player, reason :: string)
 		return false, reason
 	end
+	-- Checked before the Chonk leaves the porch: unseating and forgetting it cannot be undone, and
+	-- `addRecord` has no way to refuse by then. Nothing below yields, so the pad is still free.
+	if not Vault.freePad(player) then
+		toast(player, "vaultFull")
+		return false, "vaultFull"
+	end
 	unseat(item)
 	local rec = record(item)
 	Carry.forget(item)
@@ -331,7 +360,7 @@ function Showcase.toPorch(player: Player, pad: number): (boolean, any)
 	end
 	local ok, result = ShowcaseRules.canMoveToPorch({
 		onOwnPlot = Plots.isOnPlot(player, state.plot),
-		porchFree = Slots.firstFree(state.showcase, Config.Showcase.slots),
+		porchFree = Slots.firstFree(state.showcase, Showcase.slots()),
 	})
 	if not ok then
 		toast(player, result)
@@ -406,7 +435,8 @@ end
 
 -- Blinks the porch lights red for Config.Showcase.alarmSeconds (real seconds), then restores them.
 local function soundAlarm(plotIndex: number)
-	local token = (alarms[plotIndex] or 0) + 1
+	local token = nextAlarmToken
+	nextAlarmToken += 1
 	alarms[plotIndex] = token
 	task.spawn(function()
 		local stopAt = os.clock() + Config.Showcase.alarmSeconds
@@ -448,26 +478,30 @@ function Showcase.returnToOwner(item: Item): boolean
 	if not (owner and state and state.plot and item.status == "loose") then
 		return false
 	end
-	local porchFree = Slots.firstFree(state.showcase, Config.Showcase.slots)
+	local porchFree = Slots.firstFree(state.showcase, Showcase.slots())
 	local vaultFree = nil
 	if VaultRules.hasRoom(Slots.count(state.vault), Slots.count(state.incubators)) then
 		vaultFree = if item.kind == "chonk"
-			then Slots.firstFree(state.vault, Config.Vault.displaySlots)
+			then Vault.freePad(owner)
 			else Slots.firstFree(state.incubators, Config.Vault.incubators)
 	end
 	local where, slot = ShowcaseRules.returnPlan(porchFree, vaultFree)
 	if not (where and slot) then
 		return false
 	end
-	item.looseAt = nil
 	if where == "showcase" then
 		seatItem(owner, state.plot, slot, item)
 	elseif item.kind == "chonk" then
-		Vault.addRecord(owner, record(item))
+		-- On its pad before it is forgotten: a Vault that filled up leaves the Chonk lying there to
+		-- try again, rather than deleting it.
+		if not Vault.addRecord(owner, record(item)) then
+			return false
+		end
 		Carry.forget(item)
 	else
 		Vault.startIncubation(owner, slot, item)
 	end
+	item.looseAt = nil
 	toastText(owner, string.format(Strings.Theft.cameBack, itemName(item)))
 	return true
 end
@@ -520,9 +554,40 @@ local function reveal(item: Item)
 	Remotes.get("Reveal"):FireClient(seat.owner, porchCard(chonk))
 end
 
+-- The raid-cooldown sign above a porch, counting down while its owner is immune.
+local function updateCooldownSign(plotIndex: number, now: number)
+	local owner = Plots.ownerOf(plotIndex)
+	local state = owner and PlayerState.get(owner)
+	local left = if state then state.immuneUntil - now else 0
+	local gui = Plots.part(plotIndex, "CooldownSign"):FindFirstChildOfClass("BillboardGui")
+	local text = gui and gui:FindFirstChild("Text") :: TextLabel?
+	if gui and text then
+		gui.Enabled = left > 0
+		if left > 0 then
+			text.Text = string.format(Strings.Showcase.raidCooldown, Format.clock(left))
+		end
+	end
+end
+
+-- One porch burrito's countdown label, or its reveal once the unwrap is done.
+local function tickPorchUnwrap(item: Item, seat: Seat)
+	local left = Showcase.remaining(item) :: number
+	if left <= 0 then
+		reveal(item)
+	else
+		(seat.label :: TextLabel).Text = `{math.ceil(left)}s`
+	end
+end
+
 function Showcase.start()
+	if Config.Showcase.slots > Plots.showcasePads() then
+		warn(
+			`[Showcase] Config.Showcase.slots is {Config.Showcase.slots} but Plots builds `
+				.. `{Plots.showcasePads()} porch pads; using {Showcase.slots()}.`
+		)
+	end
 	for plotIndex = 1, Plots.count() do
-		for slot = 1, Config.Showcase.slots do
+		for slot = 1, Showcase.slots() do
 			setPlacePrompt(plotIndex, slot, true)
 		end
 	end
@@ -554,21 +619,11 @@ function Showcase.start()
 					and item.looseAt
 					and now - item.looseAt >= Config.Nest.looseReturnSeconds * scale
 				then
-					Showcase.returnToOwner(item)
+					guarded("return", Showcase.returnToOwner, item)
 				end
 			end
 			for index = 1, Plots.count() do
-				local owner = Plots.ownerOf(index)
-				local state = owner and PlayerState.get(owner)
-				local left = if state then state.immuneUntil - now else 0
-				local gui = Plots.part(index, "CooldownSign"):FindFirstChildOfClass("BillboardGui")
-				local text = gui and gui:FindFirstChild("Text") :: TextLabel?
-				if gui and text then
-					gui.Enabled = left > 0
-					if left > 0 then
-						text.Text = string.format(Strings.Showcase.raidCooldown, Format.clock(left))
-					end
-				end
+				guarded("cooldown sign", updateCooldownSign, index, now)
 			end
 		end
 	end)
@@ -579,13 +634,7 @@ function Showcase.start()
 			task.wait(0.25)
 			for item, seat in table.clone(seats) do
 				if item.kind == "burrito" and seat.label then
-					local left = Showcase.remaining(item) :: number
-					if left <= 0 then
-						-- Own thread: an error in one reveal must not stop every other porch.
-						task.spawn(reveal, item)
-					else
-						seat.label.Text = `{math.ceil(left)}s`
-					end
+					guarded("porch unwrap", tickPorchUnwrap, item, seat)
 				end
 			end
 		end

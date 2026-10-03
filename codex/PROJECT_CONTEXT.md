@@ -40,6 +40,45 @@ remaining gap in how finished it feels. Audio cannot be part-crafted -- every ro
 uploaded asset id, which falls outside "part-craft only". Roblox's own official free SFX library is
 the obvious candidate, but using it is a third-party-asset decision the user has not been asked for.
 
+## Chonk display size: 2026-10-01 (user ruling)
+
+Ten Vault display pads cannot hold ten max-size Chonks in a 40-stud house: five columns need 10.4
+studs each and the interior is 38. No grid of ten fits, which was measured rather than assumed.
+
+- Offered: cap the sizes, enlarge the houses, cut the pad count, or scale the model down on Vault
+  pads only. **The user chose to cap the sizes.** `Config.SizeScale` is now
+  `{1, 1.07, 1.14, 1.21, 1.28, 1.35}`, down from a 2.1 top.
+- **The accepted cost:** a size 6 Chonk no longer looks dramatically bigger than a size 3. If the
+  size fantasy matters more later, the other three options are still open and the houses are the
+  one that keeps it intact.
+- `sizeScale` is visual only, so no economy number moved.
+- Guarded against drift: the pad grid derives from `Config.Vault.displaySpacing`,
+  `Config.WidestBodyProfile` mirrors the widest `wide` in Models' SPECIES table, and a Lune test
+  asserts the largest body fits the spacing. Raising the top of `SizeScale` fails that test until
+  the spacing, the plot size or the slot count moves with it.
+
+## Visual direction: 2026-10-01
+
+The user asked the prototype to look like the reference game while keeping our own systems, so it
+can be shown to the mates. Recorded so nobody re-derives it:
+
+- **The reference's look was established from five promotional renders** (its Roblox store media
+  and a guide hero image), fetched and looked at directly. **None is an in-game capture** and no
+  in-game source was found; its own wiki says its gameplay gallery is not populated. They give the
+  brand language, not the shipped frame: saturated high-contrast colour, no grey haze, chunky
+  flat-shaded creatures read by silhouette, glow used as an accent, heavy outlined display type.
+- **This is colour direction only.** The partner's play experience remains the ground truth for how
+  the reference game plays and looks. Do not let a thumbnail become a mechanics claim.
+- **Still part-craft only** (user, 2026-09-29, unchanged): Studio primitives, materials and Lighting.
+  Nothing in the presentation passes is accepted art, and the art milestone is untouched.
+- **There is a ceiling here.** The genre's look leans on custom meshes and textures. Lighting,
+  colour, type and silhouette can be taken a long way with primitives, and have been; matching
+  mesh-quality creatures cannot. Lifting the art pause is the user's call, not an implementation
+  detail to decide while polishing.
+- The house style for world text is `Models.pill`: a dark rounded plate with an accent rim. Use it
+  for any new world label rather than floating outlined text, which disappears against bright
+  grass, a pale wall or the sky depending on where the player stands.
+
 ## Showcase heist (Alpha step 1): 2026-09-27
 
 Built by Claude Code from [the heist plan](../docs/superpowers/plans/2026-09-25-showcase-heist.md) on `prototype/vertical-slice`: the porch Showcase (§10), porch theft with the alarm and raid cooldown (§11), the Practice House (§11 "Dummy base"), and the "nothing deleted" returns. Verified solo; see [HANDOFF.md](HANDOFF.md).
@@ -67,14 +106,15 @@ Built by Claude Code from [the heist plan](../docs/superpowers/plans/2026-09-25-
   - The alarm runs 6 real seconds, independent of the Studio time-scale hook.
   - Draft copy for the heist is in `Strings.luau` (`Toasts`, `Theft`, `Prompts`, `Showcase`) and needs partner review.
 - **Fixed:** `default.project.json` used `Position`, which Rojo does not serialise, so built places buried the map under the Baseplate. It now uses `CFrame`.
-- **Known minor issues, deferred** (from the final review):
-  - A stolen burrito keeps its model under the victim's plot while it unwraps in the thief's Vault. State is unaffected.
-  - The loose-return and practice-respawn loops don't isolate errors per item, so one error would stop them for the session. None has been seen.
-  - When a robbed owner leaves and a new owner is robbed within 6 s, the porch lights can flicker.
-  - `Vault.addRecord`'s "no pad" result isn't checked before an item is forgotten. This can't happen today, but it would matter if the Vault ever grows beyond its built pads.
-  - `Config.Showcase.slots` above 2 errors at boot, because only two porch pads are built.
-  - The steal reach check reads `Config.Nest.grabDistance`, while the prompt reads `Config.Showcase.placeDistance` (both 8).
-  - A Chonk that has been carried no longer collides.
+- **Known minor issues from the final review: all seven fixed on 2026-10-01** (Claude Code; see
+  [HANDOFF.md](HANDOFF.md) for the evidence). They were:
+  - A stolen burrito keeping its model under the victim's plot. Carried items now live in `Workspace.World.Carried`, and an incubating one moves under the plot unwrapping it.
+  - The loose-return and practice-respawn loops not isolating errors per item. Each step now runs through a pcall that warns once per distinct fault.
+  - Porch lights able to flicker when a robbed owner leaves and a new owner is robbed within 6 s. Alarm tokens now never repeat. **The two-player case itself is still unverified.**
+  - `Vault.addRecord`'s "no pad" result going unchecked before an item was forgotten. Callers now ask `Vault.freePad` before letting go of an item, and `returnToOwner` records the Chonk before forgetting it.
+  - `Config.Showcase.slots` above 2 erroring at boot. `ShowcaseRules.usableSlots` clamps it to the pads `Plots` builds, and boot warns once. **This is a guard, not porch growth: growing past 2 slots still needs the pads built and remains later Alpha work.**
+  - Two reach configs for the same steal. `Carry.pickUp` now takes the reach from the item's status; both numbers are still 8.
+  - A Chonk colliding until it had been carried once. Chonk bodies are `CanCollide` false from the start, so a seated Chonk never blocks a player on their own porch.
 - Unchanged: the spec's open questions below. Shields, defences, Grudge/Wanted, the rookie shield and porch growth past 2 slots remain later Alpha work.
 
 ## Vertical-slice prototype: 2026-09-24

@@ -1,6 +1,243 @@
 # Current handoff
 
-Updated: 2026-09-30 by Claude Code. The vertical-slice greybox prototype was built on 2026-09-24; the Showcase heist (Alpha step 1) was built on top of it on 2026-09-27; the presentation pass landed on 2026-09-29. The Codex art notes further down (2026-09-07) are history: art is paused during the prototype.
+Updated: 2026-10-01 by Claude Code. The vertical-slice greybox prototype was built on 2026-09-24; the Showcase heist (Alpha step 1) was built on top of it on 2026-09-27; the presentation pass landed on 2026-09-29. The Codex art notes further down (2026-09-07) are history: art is paused during the prototype.
+
+## 2026-10-01 Render pop-in investigated; the idle bob was broken (Claude Code)
+
+The user reported that "renders adjust poorly and draw on screen" when moving, said they do not see
+it in live games, and asked whether Studio can test everything.
+
+**It is not part streaming.** `workspace.StreamingEnabled` is **false** (Rojo builds the place with
+the engine default, and nothing in `default.project.json` turns it on), so no part is streaming in
+or out. `ModelLevelOfDetail` is `Automatic` on all 501 Models but that only applies under streaming.
+
+**Performance is not the problem either.** Measured on the client: 60 FPS standing still and 60 FPS
+running a lap across the field, worst frame about 20 ms, zero hitches over 50 ms.
+
+**The likely cause is Roblox's automatic quality adjustment reacting to Studio's unstable frame
+rate.** `UserGameSettings.SavedQualityLevel` is `Automatic`, so the renderer continuously steps
+render distance, shadow detail and lighting fidelity up and down to hold a frame budget. Studio's
+frame rate here is not stable: **the same scene measured 15.0 FPS and then 60.0 FPS minutes apart,
+with Studio unfocused both times**, and at 15 FPS three very different render loads all reported
+exactly 15.0, which is a throttle rather than a measurement. A live client has a steady frame budget
+and the player's own quality setting, which is why the user does not see it there.
+
+A caution for the next person: **a frame-rate number taken from Studio over the MCP bridge is not
+evidence.** Studio throttles when it is not the foreground window, and the first round of
+measurements in this session was invalid for that reason.
+
+**Found and fixed while looking: the idle bob was mostly not running at all.**
+`Idle.track` returned early when `model.PrimaryPart` was nil, and **the `ChonkIdle` tag replicates
+to the client before `PrimaryPart` does**, so almost every Vault display was dropped and never
+animated. Instrumenting it showed `tracked=1` against 11 tagged models. It now waits on
+`GetPropertyChangedSignal("PrimaryPart")` and tracks the model when the property lands.
+Verified: a near model's pivot drifts 0.062 studs over a third of a second where it used to read
+0.000 across five samples. This had been "verified" on 2026-09-29 from a single sample that must
+have caught the one model that won the race.
+
+**Two cost reductions made at the same time, both measured as counts rather than frame rates:**
+
+- `Idle` now animates only models within `Config.Idle.maxDistance` (70 studs) of the camera. It was
+  re-pivoting every tagged Chonk every frame, which with eight filled plots is about 96 models of 13
+  to 32 welded parts each, most of them off screen. Verified: a model beyond the range holds still.
+- Shadow casting is off for the flat ground discs and grass patches (their shadows are underneath
+  them) and for the whole boundary, which sits 350 to 520 studs out past the shadow map's useful
+  range. Casters went from 4319 to 3407 with no visible change.
+
+**What Studio cannot test**, which is the user's actual question: its renderer shares the GPU with
+the editor and throttles in the background; Play Solo runs server and client in one process so
+replication timing is unreal; mobile input, mobile GPUs and real network conditions are absent.
+`Test > Clients and Servers` gets closer for replication. The only way to see what a player sees is
+to publish to a private or unlisted place and open it in the Roblox client.
+
+## 2026-10-01 Clipping fixed and the camera zoom bounded (Claude Code)
+
+The user reported clipping "here and there" and asked for a proper camera zoom range, with
+unlimited zoom kept for debugging only.
+
+**Clipping was measured, not eyeballed.** `.claude/tools/studio/clip_check.luau` fills a plot at the
+largest size the catalog can roll, then reports axis-aligned overlaps between every model on the
+pads and oriented-box tests against the plot's walls, trim and roof. `fillVault` now takes an
+optional size so the worst case can be set up.
+
+| Found | Fix |
+| --- | --- |
+| **14 model-to-model intersections, worst 1.95 studs.** Ten max-size Chonks on the Vault pads fused into one mass | Below |
+| **Incubators 6 studs apart, a max-size burrito 9.2 long** | Moved to local x 5 and 15, 10 apart |
+| **Carried Chonk sat 1.5 studs above the root**, which is inside the avatar's head and hair (a tester feel note) | `Config.Carry.liftAboveRoot = 2.9`; measured clearance above the avatar is now 0.81 studs |
+| **A max-size practice Chonk went through the practice house roof** (it would top out at 9.7 and the roof bottom was 7.5) | Walls 7 -> 10 tall, roof 8 -> 11, sign 12 -> 15. Clearance is now 0.8 studs |
+| Display rows were 8 studs apart | 11, the widest the room allows between the z -8 equipment row and the back wall |
+
+**The Vault grid needed a ruling and got one.** Five columns need 10.4 studs each (42 total) and the
+house interior is 38, so **ten full-size Chonks cannot fit in a 40-stud house** -- no grid of ten
+fits, which was checked rather than assumed. The user was given four options (cap the sizes, bigger
+houses, fewer pads, or a display-only scale) and **chose to cap the sizes (user, 2026-10-01)**:
+`Config.SizeScale` goes `{1, 1.15, 1.3, 1.5, 1.75, 2.1}` -> `{1, 1.07, 1.14, 1.21, 1.28, 1.35}`.
+A size 6 Chonk is no longer dramatically bigger than a size 3; that is the accepted cost.
+`sizeScale` is purely visual, so no economy number moved.
+
+To stop it drifting back: the pad grid is now derived from `Config.Vault.displaySpacing` in one
+place, `Config.WidestBodyProfile` records the widest `wide` in Models' SPECIES table, and a Lune
+test asserts `4 * sizeScale(6) * WidestBodyProfile` fits inside the spacing on both axes.
+**Re-measured: 0 model-to-model and 0 model-into-structure intersections at the largest size.**
+
+**Camera zoom is bounded.** `Config.Camera.minZoom = 8`, `maxZoom = 36`, against Roblox's defaults
+of 0.5 and 400 which let a player sit inside their own avatar or pull back past the boundary hills.
+`Config.Debug.freeCamera` restores 0.5/400 and is toggled by `DevHooks:Invoke("freeCamera", true)`;
+it is off by default, so players never get it.
+
+A gotcha worth keeping: **StarterPlayer seeds `CameraMinZoomDistance`/`CameraMaxZoomDistance` when a
+player joins and overwrites anything set at `PlayerState.Added`.** The limits are applied again once
+the character exists. Verified: a fresh join reads 8/36, `freeCamera(true)` reads 0.5/400, and
+`freeCamera(false)` puts it back.
+
+**Still there, not clipping:** two name-tag plates can overlap each other when two Chonks line up
+behind one another from the camera's angle. That is billboard crowding, not geometry.
+
+## 2026-10-01 The map is enclosed (Claude Code)
+
+The user pointed out that the map edges looked open: past the tree scatter the grass ran flat to a
+hard horizon with the baseplate edge showing, which reads as "the level stopped here". The field is
+now a valley.
+
+**Built** in `World.luau` as `boundary()`, called from `World.build`:
+
+- **One invisible wall** -- 72 segments at `fieldOuterRadius + 4` (324), 70 studs tall,
+  `Transparency = 1` and `CanQuery = false`, so it is solid to a player but invisible to every
+  raycast. **This is a behaviour change:** a player could previously run out of the field across the
+  open baseplate, and now stops at the boundary. Verified: walking outward ends at r = 322.
+- **A near rim of 44 wooded hills.** Each is a half-buried dome pushed out far enough that its foot
+  lands just outside the wall, so a player running at the boundary stops where the ground begins to
+  rise. 2 to 4 trees are planted up each slope at the dome's true surface height.
+- **A far ridge of 48 taller hills** at one fixed radius so they always overlap, lerped toward the
+  sky colour for aerial perspective. An earlier version varied the ridge radius and left gaps you
+  could see the open horizon through from a raised camera.
+
+**Everything visible is still `CanCollide` and `CanQuery` false.** Only the wall collides, which
+keeps the repository's scenery rule intact and means a player can never be wedged between two
+boundary pieces. Guardian models do not collide either, so a chase is unaffected.
+
+**Three things found by looking at screenshots, not by reasoning:**
+
+- Hills this large **cast hard black pockets onto each other**, which read as holes in the
+  landscape. They are now `CastShadow = false`: lit by sun and sky, casting nothing.
+- `GRASS_DARK` was far too dark for a face this size -- the side turned away from the sun went
+  almost black and the rim read as a wall. The hills have their own lighter greens now, and
+  `OutdoorAmbient` was raised from 0.36 to 0.66 so a big shaded face is filled by the sky rather
+  than going flat black. `ClockTime` moved 14.3 -> 13.2 for the same reason.
+- Trees on the slopes were placed from their **radial** offset alone, but the angular jitter moves
+  them sideways along the dome where the surface is lower, so some stood with their trunks buried
+  and a single leaf floating in the sky. They now use the planar distance to the dome's centre.
+
+**Verified.** 76 Lune tests, StyLua, Selene, Rojo build. In Studio on a rebuilt place: the smoke
+test is unchanged (385 plot parts, 16 prompts, 10 idle-tagged Chonks), the deferred-minors
+verification still passes end to end, containment stops the player at r = 322, and the horizon is
+closed at player height and from a 90-stud camera at every bearing checked.
+**Cost:** 684 parts for the boundary; the whole workspace is 4080 parts with no plot filled.
+
+A trap for whoever drives Studio next: a `screen_capture` taken a few seconds after `start_stop_play`
+can come back showing a half-built world (one shot here had no boundary in it at all, while the
+server reported 92 hills present). Re-shoot before believing a frame.
+
+## 2026-10-01 Second presentation pass: the genre look (Claude Code)
+
+The user asked for a larger polish so the prototype can be shown to the mates, aiming at the look
+and style of the reference game while keeping our own systems. Still **part-craft only**: Studio
+primitives, materials and Lighting properties. No Blender, no Meshy, no Studio AI generation, no
+Creator Store, and no asset ids. Nothing here is accepted art.
+
+**What the reference actually looks like, and how that was established.** The four images on the
+reference game's Roblox store page and the hero image on its beginner guide were fetched and looked
+at directly (`games.roblox.com/v2/games/<universeId>/media` -> `thumbnails.roblox.com`). **All five
+are promotional renders, not in-game captures** -- no in-game screenshot source was found, and the
+game's own wiki says its gameplay gallery is not populated yet. So they establish the *brand*
+language the genre sells on, not the shipped frame:
+
+- saturated, high-contrast colour with a deep blue sky; no grey haze;
+- big chunky blocky creatures, flat-shaded, two or three tones each, read entirely by silhouette;
+- glow and rim light used sparingly as the accent;
+- heavy outlined display type, bright green money figures, strong per-biome colour blocking.
+
+Text sources separately describe fenced per-player plots and pets on display generating income,
+which is what we already build. **The partner's play experience is still the ground truth for how
+the reference game actually plays and looks; this is colour direction, not a mechanics source.**
+
+**Changes.**
+
+| Area | Change |
+| --- | --- |
+| `default.project.json` Lighting | Atmosphere haze 1.4 -> 0.3 and density 0.32 -> 0.16 with a saturated blue decay. The haze was greying every colour past about 40 studs and was the single biggest cause of the washed-out look. brightness 2.8 -> 3.0 with the sky's `OutdoorAmbient` raised to fill shaded faces, ColorCorrection saturation 0.22 -> 0.38, bloom threshold 1.5 -> 1.95 so only neon blooms, depth of field pushed back |
+| `default.project.json` Baseplate | `LeafyGrass` -> `Grass` and a brighter, more saturated green; the old olive read brown next to the district |
+| `Plots.luau` | Eight saturated house colours, one per plot, white trim kept; warm oak decking in place of the pale cream. Eight houses in a ring are now told apart at a glance |
+| `World.luau` | District paving warmed from near-white to sand with a lighter accent ring; the zone signpost raised clear of the tree line and its post cut to reach the ground from any height |
+| `Models.luau` | New `Models.pill`, the house style for world text: dark rounded plate, accent rim, padding. `nameLabel` uses it with the tier colour as the rim, so rarity reads across the district |
+| `Plots.luau`, `DummyBase.luau` | Owner nameplates and the practice-house sign use the same plate; the practice sign is one plate holding a heading and a body |
+| `World.luau` | The zone billboard was sized in **pixels**, so it kept its screen size at any range and ballooned over the whole district from the field. Now sized in studs |
+| `Strings.luau` | The practice sign no longer repeats its own title in the body (a tester feel note) |
+
+**Verified.** 76 Lune tests, `stylua --check src tests`, `selene src`, `rojo build`, JSON valid.
+In Studio, the place was **rebuilt and reopened** (Rojo does not live-apply project property
+changes) and played solo: smoke test unchanged at 385 plot parts, 16 prompts, 10 Chonk models all
+idle-tagged. Screenshots taken before and after at district scale and at player height.
+
+**Not verified:** the field itself -- nests, guardians and scatter -- was not re-captured after the
+grass change, because the Studio window was minimised and `screen_capture` renders the 3D view
+black while it is. The field uses the same materials and lighting as the district, so it is
+expected to be fine, but nobody has looked. Two-player behaviour remains untested as before.
+
+A working note: `.claude/tools/studio/tune_light.luau` patches Lighting in the open place for fast
+grading; the numbers it holds are the ones now in `default.project.json`, so it is only useful when
+trying new values.
+
+## 2026-10-01 The seven deferred minors, fixed and verified (Claude Code)
+
+All seven "known minor issues, deferred" from the heist review in
+[PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) are fixed. No new feature work; no design question was
+decided.
+
+| Was | Now |
+| --- | --- |
+| `Config.Showcase.slots` above 2 errored at boot on a `Showcase3` pad that is never built | `Plots.showcasePads()` reports the pads that exist, the new pure `ShowcaseRules.usableSlots` takes the smaller of the two, and `Showcase.slots()` feeds every slot loop. Boot warns once and carries on |
+| `Vault.addRecord`'s "no pad" result was unchecked, so a Chonk could be forgotten | Callers ask `Vault.freePad` **before** letting go of the item (`Showcase.toVault`, `Vault.deposit`), and `returnToOwner` puts the record on its pad before forgetting the item |
+| The loose-return and practice-respawn loops would stop for the session on one bad item | Each step runs through a `guarded` pcall that warns once per distinct fault; the cooldown sign and the porch unwrap are now their own named steps. A failed practice respawn waits a full interval instead of retrying every tick |
+| The alarm token restarted from 0, so an owner change could hand a new alarm a token an older thread still thought was its own | One counter that never repeats |
+| A stolen item kept its model parented under the victim's plot | `Carry` owns `Workspace.World.Carried`; `pickUp` moves the model there, and `Vault.startIncubation` moves it under the plot that is unwrapping it |
+| Two reach configs: the steal re-check read `Config.Nest.grabDistance`, the prompt read `Config.Showcase.placeDistance` | `Carry.pickUp` picks the reach from the item's status -- a porch item uses the Showcase distance, everything else the nest's. Both are 8, so behaviour is unchanged |
+| A Chonk collided until it had been carried once, then never again | The Chonk body is `CanCollide` false from the start, like the burrito body and every decoration, so a seated Chonk can never block a player on their own porch. The geometry contract records why |
+
+`DevActions`' `porch` hook had the same slot bug and now uses `Showcase.slots()` too.
+
+**Verified.** Headless: 76 Lune tests (3 new, covering `usableSlots` and `canPlace` honouring the
+capacity it is given), `stylua --check src tests`, `selene src`, `rojo build`. In Studio, solo play
+through `ServerStorage.DevHooks` and the live instance tree
+(`.claude/tools/studio/verify_minors.luau`):
+
+- a stolen practice Chonk sits in `World.Carried`, not under the house it came from, with
+  `CanCollide` false; a Vault display Chonk reads `CanCollide` false too;
+- `toVault` with 10 of 10 pads used returns `false, "vaultFull"`, the Vault stays at 10 and the
+  Chonk is still on porch slot 1 -- nothing is lost;
+- `robMe` turns the porch lights dark red, the raid-cooldown sign counts down, and after the alarm
+  the lights read 255,226,160 again;
+- the sign switches **off** once the cooldown lapses, which only the background loop does, so the
+  loop was still alive after handling the loose item; the robbed Chonk came home to porch slot 1;
+- `Config.Showcase.slots = 3` now boots with
+  `[Showcase] Config.Showcase.slots is 3 but Plots builds 2 porch pads; using 2.` and plays
+  normally (same 385 plot parts, 16 prompts, 10 idle-tagged Chonks as the 2026-09-29 baseline).
+  Config was put back to 2 and the place rebuilt and re-smoked.
+
+**Not verified, unchanged from before:** the alarm flicker needed a robbed owner leaving and a new
+owner being robbed within 6 s, which takes two players. The fix is a one-line token change and
+reads correctly, but like everything two-player it is on the testers' list. The error path inside
+`guarded` was exercised by the loop surviving its real work, not by an injected fault.
+
+A note for whoever drives Studio next: `require(ServerScriptService.Server.X)` from an
+`execute_luau` script evaluates a **fresh copy** of that module, not the one the running server
+booted, so `PlayerState.get` comes back empty and every module-level table looks blank. Drive the
+game through `ServerStorage.DevHooks` and read the instance tree, as `AGENTS.md` already says.
+Studio's version folder moved again, to `version-76e1a02649ad4f35`; resolve it, never hardcode it.
+
+**Next step:** unchanged -- the testers run the two-player checklist and judge the feel, the devs
+rule on the heist proposals, and someone needs to rule on where game audio comes from.
 
 ## 2026-09-30 Integrated into main (Claude Code)
 

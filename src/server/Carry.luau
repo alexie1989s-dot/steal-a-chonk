@@ -40,6 +40,9 @@ local CARRY_WELD = "CarryWeld"
 
 local items: { [number]: Item } = {}
 local nextId = 1
+-- Everything in flight lives here, so a stolen Chonk is not left parented under the victim's plot
+-- while its thief runs off with it. Resting places (a nest, a porch, an incubator) reparent it back.
+local carried: Folder
 
 local function rootOf(player: Player): BasePart?
 	local character = player.Character
@@ -197,11 +200,13 @@ function Carry.pickUp(player: Player, item: Item): (boolean, string?)
 	if not (root and humanoid and humanoid.Health > 0) then
 		return false, "noCharacter"
 	end
-	-- Prompts are triggered by the client, so the server re-checks reach (spec §20).
+	-- Prompts are triggered by the client, so the server re-checks reach (spec §20). A porch item is
+	-- taken by the Showcase Steal prompt, so it uses that prompt's reach; everything else is a field grab.
+	local reach = if item.status == "showcase" then Config.Showcase.placeDistance else Config.Nest.grabDistance
 	local at = item.model:GetPivot().Position
 	if
 		Layout.planarDistance(root.Position.X, root.Position.Z, at.X, at.Z)
-		> Config.Nest.grabDistance + Config.AntiCheat.reachTolerance
+		> reach + Config.AntiCheat.reachTolerance
 	then
 		return false, "tooFar"
 	end
@@ -212,8 +217,10 @@ function Carry.pickUp(player: Player, item: Item): (boolean, string?)
 	state.carrying = item
 
 	local model = item.model
-	-- Above the head, higher for big Chonks so they never sit inside the carrier.
-	local lift = math.max(3.6, 1.5 + model:GetExtentsSize().Y / 2)
+	model.Parent = carried
+	-- Clear of the head, not merely above the torso: the old floor of 3.6 put a small Chonk's
+	-- underside at 1.5 above the root, which is inside the avatar's head and hair.
+	local lift = Config.Carry.liftAboveRoot + model:GetExtentsSize().Y / 2
 	model:PivotTo(root.CFrame * CFrame.new(0, lift, 0))
 	setPhysics(model, false)
 	local weld = Instance.new("WeldConstraint")
@@ -289,6 +296,10 @@ function Carry.knockback(player: Player, from: Vector3)
 end
 
 function Carry.start()
+	carried = Instance.new("Folder")
+	carried.Name = "Carried"
+	carried.Parent = workspace:WaitForChild("World")
+
 	PlayerState.Added:Connect(function(player: Player)
 		local function watch(character: Model)
 			local humanoid = character:WaitForChild("Humanoid", 5) :: Humanoid?

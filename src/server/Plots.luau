@@ -21,13 +21,33 @@ local owners: { [number]: Player } = {}
 local LOCAL = {
 	spawn = CFrame.new(0, 4, -14),
 	wheel = Vector3.new(-12, 1.1, -8),
-	incubators = { Vector3.new(8, 1.6, -8), Vector3.new(14, 1.6, -8) },
-	displayXs = { -14, -7, 0, 7, 14 },
-	displayZs = { 6, 14 },
+	-- Spacing has to clear the largest Chonk a plot can hold: body d = 4 * max SizeScale (8.4),
+	-- times the widest species profile (1.24) -- call it 10.4 across, 10.1 deep. The incubators
+	-- were 6 apart and a max-size burrito is 9.2 long, so two of them interpenetrated.
+	incubators = { Vector3.new(5, 1.6, -8), Vector3.new(15, 1.6, -8) },
+	-- Derived from Config.Vault.displaySpacing below, so there is one place to change the grid.
+	displayColumns = 5,
+	-- Rows pushed as far apart as the room allows: the back wall's inner face is at z 19 and the
+	-- wheel and incubators sit at z -8, so the pair straddles z 8.5.
+	displayRowCentre = 8.5,
 	-- The porch strip is z -20..-12; x = 0 is the spawn, so the slots sit either side of it.
 	showcase = { Vector3.new(-8, 1.3, -16), Vector3.new(8, 1.3, -16) },
 	porchLights = { Vector3.new(-19, 3, -19.5), Vector3.new(19, 3, -19.5) },
 	cooldownSign = Vector3.new(0, 10.5, -16),
+}
+
+-- One saturated wall colour per plot, so eight houses in a ring are told apart at a glance and a
+-- raider can say "the teal one". Trim stays white on all of them, which is what holds the ring
+-- together as one street.
+local HOUSE_COLORS = {
+	Color3.fromRGB(236, 94, 104),
+	Color3.fromRGB(246, 150, 58),
+	Color3.fromRGB(248, 202, 70),
+	Color3.fromRGB(104, 198, 124),
+	Color3.fromRGB(72, 186, 190),
+	Color3.fromRGB(84, 150, 232),
+	Color3.fromRGB(160, 122, 224),
+	Color3.fromRGB(230, 116, 180),
 }
 
 local PORCH_LIGHT = Color3.fromRGB(255, 226, 160)
@@ -63,7 +83,7 @@ local function buildPlot(index: number, frame: CFrame, parent: Instance): Model
 		Name = "Floor",
 		Size = Vector3.new(size, 1, size),
 		CFrame = at(Vector3.new(0, 0.5, 0)),
-		Color = Color3.fromRGB(222, 206, 178),
+		Color = Color3.fromRGB(206, 160, 104),
 		Material = Enum.Material.WoodPlanks,
 		Parent = model,
 	})
@@ -71,15 +91,15 @@ local function buildPlot(index: number, frame: CFrame, parent: Instance): Model
 		Name = "Porch",
 		Size = Vector3.new(size, 0.2, 8),
 		CFrame = at(Vector3.new(0, 1.1, -size / 2 + 4)),
-		Color = Color3.fromRGB(245, 232, 205),
+		Color = Color3.fromRGB(230, 188, 130),
 		Material = Enum.Material.WoodPlanks,
 		Parent = model,
 	})
 	-- Walls on the back and sides; the porch side stays open. The house is deliberately left
 	-- open at the top: the Vault display pads are inside it, and a roof over them would fight
 	-- the player's camera every time they walked in to sort their Chonks.
-	local WALL = Color3.fromRGB(240, 170, 150)
-	local TRIM = Color3.fromRGB(255, 244, 228)
+	local WALL = HOUSE_COLORS[(index - 1) % #HOUSE_COLORS + 1]
+	local TRIM = Color3.fromRGB(255, 250, 242)
 	local wallTop = 8
 	for _, wall in
 		{
@@ -360,9 +380,17 @@ local function buildPlot(index: number, frame: CFrame, parent: Instance): Model
 			Transparency = 0.6,
 		})
 	end
+	local gap = Config.Vault.displaySpacing
+	local displayXs, displayZs = {}, {}
+	for i = 1, LOCAL.displayColumns do
+		table.insert(displayXs, (i - (LOCAL.displayColumns + 1) / 2) * gap.x)
+	end
+	for _, side in { -1, 1 } do
+		table.insert(displayZs, LOCAL.displayRowCentre + side * gap.z / 2)
+	end
 	local display = 0
-	for _, z in LOCAL.displayZs do
-		for _, x in LOCAL.displayXs do
+	for _, z in displayZs do
+		for _, x in displayXs do
 			display += 1
 			Models.part({
 				Name = `Display{display}`,
@@ -392,20 +420,20 @@ local function buildPlot(index: number, frame: CFrame, parent: Instance): Model
 		Parent = model,
 	})
 	local gui = Instance.new("BillboardGui")
-	gui.Size = UDim2.fromOffset(260, 44)
+	gui.Size = UDim2.fromOffset(280, 50)
 	-- Eight houses stand in a ring, so a long range stacks every label into one smear.
 	gui.MaxDistance = 140
 	gui.Parent = sign
 	local text = Instance.new("TextLabel")
 	text.Name = "Text"
 	text.Size = UDim2.fromScale(1, 1)
-	text.BackgroundTransparency = 1
 	text.Font = Enum.Font.FredokaOne
 	text.TextScaled = true
 	text.TextColor3 = Color3.new(1, 1, 1)
-	text.TextStrokeTransparency = 0.4
 	text.Text = "Empty lot"
 	text.Parent = gui
+	-- Rimmed in this house's own colour, so the nameplate and the walls agree.
+	Models.pill(text, WALL)
 
 	model.Parent = parent
 	return model
@@ -429,6 +457,11 @@ end
 
 function Plots.count(): number
 	return #models
+end
+
+-- How many porch Showcase pads each plot has. The layout above is the authority, not Config.
+function Plots.showcasePads(): number
+	return #LOCAL.showcase
 end
 
 function Plots.spawnCFrame(index: number): CFrame

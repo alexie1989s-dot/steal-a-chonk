@@ -14,7 +14,14 @@ Config.Economy = {
 -- Indexed by size 1..6: A Fine Boi .. OH LAWD HE COMIN
 Config.SizeIncome = { 1, 1.5, 2.5, 4, 7, 12 } -- §25
 Config.SizeUnwrap = { 1, 1.4, 1.8, 2.2, 2.6, 3 } -- §25 gives 1 to 3; fill is a slice proposal
-Config.SizeScale = { 1, 1.15, 1.3, 1.5, 1.75, 2.1 } -- model scale, slice proposal
+-- Model scale, slice proposal. Capped so that ten Chonks on the Vault display pads never
+-- interpenetrate: the widest body a plot can hold is `4 * max(SizeScale) * WidestBodyProfile`, and
+-- that has to stay under Vault.displaySpacing. Raising the top of this list needs one of the pad
+-- spacing, the plot size or the slot count to move with it (user ruling, 2026-10-01).
+Config.SizeScale = { 1, 1.07, 1.14, 1.21, 1.28, 1.35 }
+-- The largest `wide` in Models' SPECIES table. Kept here so the fit can be checked by a pure test
+-- without loading a server module; raise it if a new Chonk is built wider.
+Config.WidestBodyProfile = 1.24
 Config.SizeWeights = { 50, 25, 13, 7, 4, 1 } -- slice proposal
 
 -- §25 gives Common 20 s and Secret 20 min; the geometric fill is a slice proposal.
@@ -81,6 +88,9 @@ Config.Vault = {
 	incubators = 2, -- §10
 	displaySlots = 10, -- slice proposal
 	promptDistance = 8,
+	-- How far apart Plots sets the display pads. The house interior is 38 studs across, so five
+	-- columns cannot be spaced wider than this without pushing a Chonk through a wall.
+	displaySpacing = { x = 7, z = 11 },
 }
 
 -- The porch Showcase (§10, §11). Heist proposals: docs/superpowers/plans/2026-09-25-showcase-heist.md.
@@ -103,6 +113,9 @@ Config.DummyBase = {
 }
 
 Config.Carry = {
+	-- How far above the HumanoidRootPart a carried model's underside sits. The avatar's head tops
+	-- out about 2.5 studs above the root, so anything less clips through the hair.
+	liftAboveRoot = 2.9,
 	knockbackSpeed = 60,
 	knockbackLift = 30,
 	crossingCheckSeconds = 0.2,
@@ -160,6 +173,21 @@ Config.Camera = {
 	baseFov = 70,
 	fovPerSpeed = 0.6,
 	maxExtraFov = 20,
+	-- Zoom is bounded on purpose. Roblox's default 0.5 to 400 lets a player sit inside their own
+	-- avatar and the Chonk they are carrying, or pull back until the district is a dot and the
+	-- camera is out past the boundary hills. These keep the game framed like a game.
+	minZoom = 8,
+	maxZoom = 36,
+	-- What Debug.freeCamera opens the range back up to: Roblox's own defaults.
+	debugMinZoom = 0.5,
+	debugMaxZoom = 400,
+}
+
+Config.Idle = {
+	-- The idle bob re-pivots a whole Chonk model every frame, and a model is 13 to 32 welded parts.
+	-- Eight filled plots is around 96 of them, so animating the ones you cannot see was most of the
+	-- cost for none of the benefit. Past this distance from the camera they just sit still.
+	maxDistance = 70,
 }
 
 -- CollectionService tags. The client watches these; the server is the only thing that sets them.
@@ -170,6 +198,9 @@ Config.Tags = {
 -- Studio testing only: DevHooks can scale unwrap, respawn and loose-return timers.
 Config.Debug = {
 	timeScale = 1,
+	-- Studio only, off by default: lifts the camera zoom limits so the whole map can be inspected.
+	-- DevHooks "freeCamera" toggles it; players never get it.
+	freeCamera = false,
 }
 
 return Config

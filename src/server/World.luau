@@ -22,8 +22,16 @@ local LEAF = Color3.fromRGB(86, 158, 74)
 local LEAF_LIGHT = Color3.fromRGB(118, 190, 96)
 local BARK = Color3.fromRGB(122, 90, 62)
 local STONE = Color3.fromRGB(150, 150, 156)
-local PAVE = Color3.fromRGB(214, 206, 190)
-local PAVE_ALT = Color3.fromRGB(198, 189, 172)
+-- Warm sand rather than the near-white it was: at this size the district is most of the screen,
+-- and a pale grey disc drained the colour out of everything standing on it.
+local PAVE = Color3.fromRGB(226, 188, 136)
+local PAVE_ALT = Color3.fromRGB(206, 162, 108)
+local PAVE_RING = Color3.fromRGB(242, 212, 160)
+-- The boundary hills keep their own greens. GRASS_DARK was too dark for a face this big: the side
+-- turned away from the sun went almost black and the rim read as a wall rather than as hills.
+local HILL = Color3.fromRGB(136, 190, 108)
+local RIDGE = Color3.fromRGB(120, 166, 124)
+local WALL_HEIGHT = 70
 local CURB_YELLOW = Color3.fromRGB(255, 214, 64)
 local CURB_DARK = Color3.fromRGB(64, 58, 78)
 local PETALS = {
@@ -42,6 +50,8 @@ end
 
 local function flatDisc(name: string, radius: number, height: number, y: number, color: Color3, parent: Instance)
 	return prop({
+		-- Lying flat on the ground, so its shadow is hidden underneath it: pure cost, no picture.
+		CastShadow = false,
 		Name = name,
 		Shape = Enum.PartType.Cylinder,
 		Size = Vector3.new(height, radius * 2, radius * 2),
@@ -56,11 +66,14 @@ end
 local function signpost(text: string, position: Vector3, parent: Instance)
 	local model = Instance.new("Model")
 	model.Name = "ZoneSign"
+	-- The post is cut to reach the ground from wherever the board hangs, so the board can be raised
+	-- over the tree line without the sign ending up on stilts.
+	local postLength = math.max(position.Y - 6, 4)
 	prop({
 		Name = "Post",
 		Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(24, 1.6, 1.6),
-		CFrame = CFrame.new(position - Vector3.new(0, 12, 0)) * CFrame.Angles(0, 0, math.pi / 2),
+		Size = Vector3.new(postLength, 1.6, 1.6),
+		CFrame = CFrame.new(position - Vector3.new(0, 6 + postLength / 2, 0)) * CFrame.Angles(0, 0, math.pi / 2),
 		Color = BARK,
 		Material = Enum.Material.Wood,
 		Parent = model,
@@ -82,7 +95,9 @@ local function signpost(text: string, position: Vector3, parent: Instance)
 		Parent = model,
 	})
 	local gui = Instance.new("BillboardGui")
-	gui.Size = UDim2.fromOffset(420, 90)
+	-- Sized in studs, not pixels: an offset-sized billboard keeps its screen size at any range, so
+	-- the zone name used to balloon over the whole district when seen from the field.
+	gui.Size = UDim2.fromScale(40, 9)
 	gui.StudsOffset = Vector3.new(0, 0, 1)
 	gui.AlwaysOnTop = false
 	gui.MaxDistance = 600
@@ -261,6 +276,112 @@ end
 
 export type WorldInfo = { nests: { Vector3 }, curbRadius: number }
 
+-- The field edge. Without this the map ran out into an open plain with a hard horizon line, which
+-- reads as "the level stopped here". A ring of wooded hills closes it off.
+--
+-- One invisible wall does all of the containing, and every visible piece stays CanCollide false,
+-- so the hills can overlap the boundary freely without a player ever being wedged between two of
+-- them, and a prompt raycast can never catch the wall.
+local function boundary(root: Instance, rng: Random)
+	local base = Config.Base
+	local wall = base.fieldOuterRadius + 4
+	local fence = Instance.new("Folder")
+	fence.Name = "Boundary"
+	fence.Parent = root
+
+	local segments = 72
+	local segmentLength = 2 * math.pi * wall / segments + 2
+	for i = 1, segments do
+		local angle = 2 * math.pi * (i - 0.5) / segments
+		local position = Vector3.new(wall * math.cos(angle), WALL_HEIGHT / 2, wall * math.sin(angle))
+		local tangent = Vector3.new(-math.sin(angle), 0, math.cos(angle))
+		Models.part({
+			Name = "FieldWall",
+			Size = Vector3.new(4, WALL_HEIGHT, segmentLength),
+			CFrame = CFrame.lookAt(position, position + tangent),
+			Transparency = 1,
+			CanQuery = false, -- solid to a player, invisible to every raycast
+			Parent = fence,
+		})
+	end
+
+	-- A dome half buried in the ground: `height` is how far it stands above the grass, `width` how
+	-- far it spreads. Returns the surface height at a given distance from its centre, so trees can
+	-- be planted up the slope instead of floating or sinking into it.
+	local function hill(centreRadius: number, angle: number, width: number, height: number, color: Color3)
+		local x, z = centreRadius * math.cos(angle), centreRadius * math.sin(angle)
+		prop({
+			Name = "Hill",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(width, height * 2, width * (0.78 + rng:NextNumber() * 0.3)),
+			CFrame = CFrame.new(x, 0, z) * CFrame.Angles(0, rng:NextNumber() * 6, 0),
+			Color = color,
+			Material = Enum.Material.Grass,
+			-- Overlapping domes this size threw hard black pockets onto each other, which read as
+			-- holes in the landscape. They are lit by the sun and the sky, and cast nothing.
+			CastShadow = false,
+			Parent = fence,
+		})
+		-- Surface height at a planar distance from the hill's centre. Measured against the dome's
+		-- narrower axis, so anything planted on it sinks slightly rather than floating.
+		return function(distance: number): number
+			local t = math.clamp(distance / (width * 0.39), 0, 1)
+			return height * math.sqrt(math.max(1 - t * t, 0))
+		end,
+			x,
+			z
+	end
+
+	-- The near rim: each hill is pushed out far enough that its foot lands just outside the wall,
+	-- so a player running at the boundary stops where the ground starts to rise.
+	local rimCount = 44
+	for i = 1, rimCount do
+		local angle = 2 * math.pi * (i - 0.5) / rimCount + (rng:NextNumber() - 0.5) * 0.04
+		local width = 132 + rng:NextNumber() * 54
+		local height = 30 + rng:NextNumber() * 16
+		local centreRadius = wall + width / 2 + 4
+		local surfaceAt, hx, hz =
+			hill(centreRadius, angle, width, height, Models.shade(HILL, (rng:NextNumber() - 0.45) * 0.16))
+		-- Trees up the slope and along the foot, so the rim reads as woods rather than as a berm.
+		for _ = 1, rng:NextInteger(2, 4) do
+			local r = centreRadius + (rng:NextNumber() - 0.35) * width * 0.6
+			local treeAngle = angle + (rng:NextNumber() - 0.5) * 0.08
+			local tx, tz = r * math.cos(treeAngle), r * math.sin(treeAngle)
+			tree(
+				Vector3.new(tx, surfaceAt(Layout.planarDistance(tx, tz, hx, hz)) - 1.5, tz),
+				1 + rng:NextNumber() * 0.6,
+				rng,
+				fence
+			)
+		end
+	end
+
+	-- The far ridge: taller, cooler and bluer, so it reads as distance. This is what closes the
+	-- horizon once the camera lifts above the near rim.
+	-- One radius for the whole band, so the hills always overlap. Letting it vary left gaps you
+	-- could see the open horizon through from a raised camera.
+	local ridgeCount = 48
+	local ridgeRadius = wall + 190
+	for i = 1, ridgeCount do
+		local angle = 2 * math.pi * (i - 0.5) / ridgeCount + (rng:NextNumber() - 0.5) * 0.05
+		hill(
+			ridgeRadius,
+			angle,
+			230 + rng:NextNumber() * 70,
+			118 + rng:NextNumber() * 40,
+			RIDGE:Lerp(Color3.new(0.58, 0.7, 0.8), 0.18 + rng:NextNumber() * 0.22)
+		)
+	end
+
+	-- The whole boundary sits 350 to 520 studs out, past the shadow map's useful range, so nothing
+	-- in it casts. That is 684 parts taken out of the shadow pass for no visible change.
+	for _, d in fence:GetDescendants() do
+		if d:IsA("BasePart") then
+			d.CastShadow = false
+		end
+	end
+end
+
 function World.build(): WorldInfo
 	local existing = workspace:FindFirstChild("World")
 	if existing then
@@ -273,10 +394,10 @@ function World.build(): WorldInfo
 	local base = Config.Base
 
 	-- Paving in three concentric tones, so the district reads as laid rather than poured.
-	flatDisc("BaseApron", base.curbRadius + 10, 0.3, 0.12, Color3.fromRGB(122, 168, 96), root)
+	flatDisc("BaseApron", base.curbRadius + 10, 0.3, 0.12, Color3.fromRGB(108, 172, 80), root)
 	flatDisc("BaseDistrict", base.curbRadius, 0.4, 0.2, PAVE, root)
-	flatDisc("BaseRingOuter", base.curbRadius - 16, 0.42, 0.24, PAVE_ALT, root)
-	flatDisc("BaseRingInner", base.plotRingRadius - 24, 0.44, 0.28, PAVE, root)
+	flatDisc("BaseRingOuter", base.curbRadius - 16, 0.42, 0.24, PAVE_RING, root)
+	flatDisc("BaseRingInner", base.plotRingRadius - 24, 0.44, 0.28, PAVE_ALT, root)
 	flatDisc("Medallion", 16, 0.5, 0.32, CURB_YELLOW, root)
 	flatDisc("MedallionEye", 9, 0.52, 0.36, PAVE, root)
 
@@ -402,6 +523,7 @@ function World.build(): WorldInfo
 			-- A darker grass patch under the prop, to break up the flat ground.
 			prop({
 				Name = "Patch",
+				CastShadow = false,
 				Shape = Enum.PartType.Cylinder,
 				Size = Vector3.new(0.2, 16 + rng:NextNumber() * 14, 16 + rng:NextNumber() * 14),
 				CFrame = CFrame.new(at + Vector3.new(0, 0.06, 0)) * CFrame.Angles(0, 0, math.pi / 2),
@@ -412,7 +534,11 @@ function World.build(): WorldInfo
 		end
 	end
 
-	signpost(Strings.World.zoneSign, Vector3.new(0, 26, base.curbRadius + 60), root)
+	boundary(root, rng)
+
+	-- Raised clear of the tree line: this is the one landmark that tells a new player where the
+	-- district is from anywhere in the field.
+	signpost(Strings.World.zoneSign, Vector3.new(0, 44, base.curbRadius + 60), root)
 
 	root.Parent = workspace
 	return { nests = nests, curbRadius = base.curbRadius }

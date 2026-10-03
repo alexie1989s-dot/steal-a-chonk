@@ -23,27 +23,27 @@
 			"$properties": {
 				"Technology": "ShadowMap",
 				"GlobalShadows": true,
-				"ShadowSoftness": 0.4,
-				"Brightness": 2.8,
-				"ClockTime": 15,
+				"ShadowSoftness": 0.25,
+				"Brightness": 3.0,
+				"ClockTime": 13.2,
 				"GeographicLatitude": 20,
-				"ExposureCompensation": 0.2,
-				"EnvironmentDiffuseScale": 0.65,
-				"EnvironmentSpecularScale": 0.45,
-				"Ambient": [0.26, 0.27, 0.33],
-				"OutdoorAmbient": [0.44, 0.47, 0.55],
-				"ColorShift_Top": [0.11, 0.07, 0.02],
-				"ColorShift_Bottom": [0.03, 0.05, 0.09]
+				"ExposureCompensation": 0.05,
+				"EnvironmentDiffuseScale": 0.5,
+				"EnvironmentSpecularScale": 0.35,
+				"Ambient": [0.32, 0.34, 0.4],
+				"OutdoorAmbient": [0.66, 0.71, 0.81],
+				"ColorShift_Top": [0.14, 0.09, 0.02],
+				"ColorShift_Bottom": [0.02, 0.04, 0.08]
 			},
 			"Atmosphere": {
 				"$className": "Atmosphere",
 				"$properties": {
-					"Density": 0.32,
-					"Offset": 0.15,
-					"Color": [0.78, 0.82, 0.87],
-					"Decay": [0.42, 0.45, 0.51],
-					"Glare": 0.35,
-					"Haze": 1.4
+					"Density": 0.16,
+					"Offset": 0.1,
+					"Color": [0.804, 0.878, 0.961],
+					"Decay": [0.361, 0.502, 0.714],
+					"Glare": 0.12,
+					"Haze": 0.3
 				}
 			},
 			"Sky": {
@@ -57,33 +57,33 @@
 			"Bloom": {
 				"$className": "BloomEffect",
 				"$properties": {
-					"Intensity": 0.55,
-					"Size": 22,
-					"Threshold": 1.5
+					"Intensity": 0.5,
+					"Size": 20,
+					"Threshold": 1.95
 				}
 			},
 			"ColorCorrection": {
 				"$className": "ColorCorrectionEffect",
 				"$properties": {
-					"Brightness": 0.02,
-					"Contrast": 0.14,
-					"Saturation": 0.22,
-					"TintColor": [1, 0.99, 0.96]
+					"Brightness": 0.015,
+					"Contrast": 0.2,
+					"Saturation": 0.38,
+					"TintColor": [1, 0.99, 0.95]
 				}
 			},
 			"SunRays": {
 				"$className": "SunRaysEffect",
 				"$properties": {
-					"Intensity": 0.06,
-					"Spread": 0.6
+					"Intensity": 0.035,
+					"Spread": 0.5
 				}
 			},
 			"DepthOfField": {
 				"$className": "DepthOfFieldEffect",
 				"$properties": {
-					"FarIntensity": 0.1,
-					"FocusDistance": 60,
-					"InFocusRadius": 140,
+					"FarIntensity": 0.03,
+					"FocusDistance": 90,
+					"InFocusRadius": 260,
 					"NearIntensity": 0
 				}
 			}
@@ -108,8 +108,8 @@
 							"orientation": [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
 						}
 					},
-					"Material": "LeafyGrass",
-					"Color": [0.35, 0.55, 0.28]
+					"Material": "Grass",
+					"Color": [0.4, 0.65, 0.29]
 				}
 			},
 			"SpawnLocation": {

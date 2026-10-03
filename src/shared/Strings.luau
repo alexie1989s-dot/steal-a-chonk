@@ -66,7 +66,8 @@ Strings.Prompts = {
 
 Strings.Showcase = {
 	raidCooldown = "Raid cooldown %s",
-	dummySign = "PRACTICE HOUSE: steal the Chonk, carry it home. Nobody minds.",
+	-- The sign shows dummyHouse as its heading, so the body no longer repeats the name.
+	dummySign = "Steal the Chonk, carry it home. Nobody minds.",
 	dummyHouse = "Practice House",
 }
 

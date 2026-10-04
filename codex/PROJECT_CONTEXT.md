@@ -1,6 +1,6 @@
 # Steal a Chonk: project context
 
-Onboarded 2026-09-06; current asset update 2026-09-07; vertical-slice prototype 2026-09-24; Showcase heist 2026-09-27; presentation pass 2026-09-29; art paused for the prototype 2026-09-25; repository public on GitHub since 2026-09-25. This is a source-based project summary, not a new game design proposal.
+Onboarded 2026-09-06; current asset update 2026-09-07; vertical-slice prototype 2026-09-24; Showcase heist 2026-09-27; presentation pass 2026-09-29; Roblox-official assets and sound allowed 2026-10-04; art paused for the prototype 2026-09-25; repository public on GitHub since 2026-09-25. This is a source-based project summary, not a new game design proposal.
 
 ## Art paused during the prototype (2026-09-25)
 
@@ -32,13 +32,60 @@ What this does and does not settle:
   `d / 2 + 1.5`. Anything that changes body proportions must keep that.
 - **The house play area is deliberately left unroofed.** The Vault display pads sit inside the
   house, and a roof over them fights the player camera. This is a decision, not an omission.
+  Since 2026-10-04 each plot has a **cottage behind its back wall**, front on the plaza and roof
+  rising over the back wall. That makes the ring read as a street of houses with yards. The yard
+  stays open. The cottage's visible parts never collide (Roblox's camera only pops on opaque
+  colliding parts), and one invisible block stops anyone walking into it.
 - **Field scenery never collides.** All dressing is `CanCollide` and `CanQuery` false so it cannot
   block a chase, a juke, or a prompt raycast (spec §11).
 
-**Open, needs a ruling: sound.** The prototype has no audio whatsoever, and it is now the largest
-remaining gap in how finished it feels. Audio cannot be part-crafted -- every route needs an
-uploaded asset id, which falls outside "part-craft only". Roblox's own official free SFX library is
-the obvious candidate, but using it is a third-party-asset decision the user has not been asked for.
+**Sound: settled 2026-10-04,** see the next section. (It was open here: audio cannot be
+part-crafted, so it needed a third-party-asset ruling.)
+
+## Roblox-official assets and sound: 2026-10-04 (user ruling)
+
+The user asked to use "more free stuff from Roblox Studio itself" for menu buttons, notifications
+and props "free to use and allowed in any game". Offered engine built-ins only, built-ins plus
+Roblox-official assets, or vetted third-party assets as well, **the user chose built-ins plus
+Roblox-official assets**, and **chose to add sound from Roblox's library**. This loosens the
+2026-09-29 "part-craft only" rule for scenery, UI and audio. **It does not touch the Chonks**: they
+stay part-built, and the art pause and the art milestone are unchanged.
+
+What is allowed now, and only this:
+
+- **Engine built-ins:** bundled fonts (Luckiest Guy, Fredoka One and the rest of the client's
+  font families), GUI objects and tweens, emoji in text.
+- **Models published by the Roblox account itself** (creator id 1). In use: the **Synty Nature
+  Pack** (`6933438443`) and the **Synty City Pack** (`6933556508`), whose store descriptions say
+  they were "officially licensed for use in any Roblox game". Both ship with zero scripts, and
+  `Props` deletes any script that ever appears in them.
+- **Audio from the Roblox account and from the licensed library Roblox provides to every
+  experience**: the verified `ProSoundEffects` (id 7462895450) and `APMOfficial` (id 7462718749)
+  accounts. Every sound and its source is listed in `src/shared/Sounds.luau`, and a Lune test fails
+  on any other source.
+- **Not allowed:** free models, images or audio from any other creator, anything with scripts,
+  Studio AI generation, and Blender or Meshy output.
+
+How it is wired, so nobody re-derives it:
+
+- **The repository holds asset ids, not the models.** `Props.load()` runs before `World.build()`
+  and fetches the packs with `InsertService:LoadAsset`, which works for Roblox-owned assets even in
+  an unpublished place. If a pack has not arrived within `Config.Props.loadTimeout` (12 s), the
+  world is built from the part versions instead, so the game never depends on the download.
+  Keeping the meshes out of Git also avoids redistributing Roblox-licensed content from a public
+  repository.
+- **Pack meshes that carry a `SurfaceAppearance` are skipped.** In these packs they are older
+  leaf-card assets (the `Pine_Tree_Pine_*`, birch, willow, fern and `PurpleFlower` meshes) whose
+  texture packs fail to parse, one console warning per copy. Use the `PolygonNature_*` and
+  `PolygonCity_*` meshes.
+- **Scenery rules are unchanged.** Every placed mesh is anchored with `CanCollide`, `CanTouch` and
+  `CanQuery` false.
+- **Every toast has a tone and a sound.** `Sounds.Toasts` and `Sounds.Theft` give each message a
+  tone (good, bad, alert or info) and a sound. A Lune test fails if a toast string has no style.
+  Servers send toasts through `Notify`.
+- **Sound choices were made from names, descriptions and lengths. Nobody has listened to them.**
+  All 18 were checked to load in Studio. The testers should judge them, and any of them can be
+  swapped by changing an id in `Sounds.luau`.
 
 ## Chonk display size: 2026-10-01 (user ruling)
 
@@ -69,15 +116,29 @@ can be shown to the mates. Recorded so nobody re-derives it:
   flat-shaded creatures read by silhouette, glow used as an accent, heavy outlined display type.
 - **This is colour direction only.** The partner's play experience remains the ground truth for how
   the reference game plays and looks. Do not let a thumbnail become a mechanics claim.
-- **Still part-craft only** (user, 2026-09-29, unchanged): Studio primitives, materials and Lighting.
-  Nothing in the presentation passes is accepted art, and the art milestone is untouched.
+- **Chonks are still part-craft only.** Scenery, UI and audio may also use Roblox-official assets
+  since 2026-10-04 (section above). Nothing in the presentation passes is accepted art, and the art
+  milestone is untouched.
 - **There is a ceiling here.** The genre's look leans on custom meshes and textures. Lighting,
   colour, type and silhouette can be taken a long way with primitives, and have been; matching
   mesh-quality creatures cannot. Lifting the art pause is the user's call, not an implementation
   detail to decide while polishing.
-- The house style for world text is `Models.pill`: a dark rounded plate with an accent rim. Use it
-  for any new world label rather than floating outlined text, which disappears against bright
-  grass, a pale wall or the sky depending on where the player stands.
+- **World text has two forms since 2026-10-04, and nothing else should float in the world**
+  (`Models.luau`, "World text"). The user reported text that rendered badly at a distance and
+  looked misaligned. The cause was that every label was sized in pixels, depth-tested, and many
+  of them were signs.
+  - **Labels** (Chonk name tags, unwrap timers, BONK/MRRP) come from `Models.worldLabel`. They are
+    sized partly in studs, so they shrink with distance, and partly in pixels, so a far label
+    stays legible. They hang by their bottom edge (`SizeOffset (0, 0.5)`) straight up in world
+    space and draw on top (`AlwaysOnTop`), so a wall or beam never slices them. The client
+    `NameTags` thins the name tags so they never overlap and fades them over the last fifth of
+    their range.
+  - **Signs** (house names, the practice house, the zone board, the raid cooldown) are printed
+    onto a face of a real board with `Models.signFace` / `Models.signText` (a SurfaceGui).
+    A billboard on a flat board turns to face the camera while the board does not, so from an
+    angle the board cut the letters in half.
+  - Luckiest Guy's lower case is a set of small capitals at odd heights ("PeDAL!"), so set it in
+    capitals only. Use Fredoka One for mixed case.
 
 ## Showcase heist (Alpha step 1): 2026-09-27
 

@@ -6,9 +6,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Layout = require(ReplicatedStorage.Shared.Layout)
-local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local Strings = require(ReplicatedStorage.Shared.Strings)
 local Models = require(script.Parent.Models)
+local Notify = require(script.Parent.Notify)
 local PlayerState = require(script.Parent.PlayerState)
 
 local Plots = {}
@@ -32,8 +32,9 @@ local LOCAL = {
 	displayRowCentre = 8.5,
 	-- The porch strip is z -20..-12; x = 0 is the spawn, so the slots sit either side of it.
 	showcase = { Vector3.new(-8, 1.3, -16), Vector3.new(8, 1.3, -16) },
-	porchLights = { Vector3.new(-19, 3, -19.5), Vector3.new(19, 3, -19.5) },
-	cooldownSign = Vector3.new(0, 10.5, -16),
+	-- Standing on the front ends of the knee walls (top at y 3.5), not sunk into them.
+	porchLights = { Vector3.new(-19.5, 4.45, -19.5), Vector3.new(19.5, 4.45, -19.5) },
+	cooldownSign = Vector3.new(0, 6.75, -19.5), -- hangs under the porch beam (beam bottom 7.8)
 }
 
 -- One saturated wall colour per plot, so eight houses in a ring are told apart at a glance and a
@@ -51,6 +52,9 @@ local HOUSE_COLORS = {
 }
 
 local PORCH_LIGHT = Color3.fromRGB(255, 226, 160)
+-- The hamster wheel's rim radius and width, round the treadle (Config.Wheel.radius is the treadle).
+local WHEEL_RADIUS = 5.5
+local WHEEL_WIDTH = 5
 Plots.PORCH_LIGHT = PORCH_LIGHT
 
 -- Marks a prompt for the client PromptFilter: shown to the plot's owner ("owner") or everyone else ("others").
@@ -59,14 +63,21 @@ function Plots.tagPrompt(prompt: ProximityPrompt, plotIndex: number, audience: "
 	prompt:SetAttribute("Audience", audience)
 end
 
+-- Every printed copy of the house name (Models.signText lines named "OwnerName").
 local function ownerLabel(index: number)
-	local sign = models[index]:FindFirstChild("OwnerSign")
-	local label = sign and sign:FindFirstChildWhichIsA("BillboardGui")
-	local text = label and label:FindFirstChild("Text") :: TextLabel?
-	if text then
-		local owner = owners[index]
-		text.Text = if owner then `{owner.DisplayName}'s house` else "Empty lot"
+	local owner = owners[index]
+	local value = if owner then `{owner.DisplayName}'s house` else "Empty lot"
+	for _, d in models[index]:GetDescendants() do
+		if d.Name == "OwnerName" and d:IsA("TextLabel") then
+			d.Text = value
+		end
 	end
+end
+
+-- The house name printed on one face of a board.
+local function nameSign(board: BasePart, face: Enum.NormalId)
+	local panel = Models.signFace(board, face)
+	Models.signText(panel, "OwnerName", "Empty lot", Color3.new(1, 1, 1), UDim2.fromScale(0, 0), UDim2.fromScale(1, 1))
 end
 
 local function buildPlot(index: number, frame: CFrame, parent: Instance): Model
@@ -100,6 +111,7 @@ local function buildPlot(index: number, frame: CFrame, parent: Instance): Model
 	-- the player's camera every time they walked in to sort their Chonks.
 	local WALL = HOUSE_COLORS[(index - 1) % #HOUSE_COLORS + 1]
 	local TRIM = Color3.fromRGB(255, 250, 242)
+	local BASE = Models.shade(WALL, -0.28)
 	local wallTop = 8
 	for _, wall in
 		{
@@ -116,6 +128,40 @@ local function buildPlot(index: number, frame: CFrame, parent: Instance): Model
 			Parent = model,
 		})
 	end
+	-- The yard walls in two tones: a darker band along the foot of every inside face, and posts down
+	-- the outside of the side walls, so a forty-stud wall reads as built rather than as one flat slab.
+	local BAND = Models.shade(WALL, -0.18)
+	for _, band in
+		{
+			{ Vector3.new(0, 2.3, size / 2 - 1.1), Vector3.new(size - 2, 2.6, 0.2) },
+			{ Vector3.new(-size / 2 + 1.1, 2.3, 4), Vector3.new(0.2, 2.6, size - 8) },
+			{ Vector3.new(size / 2 - 1.1, 2.3, 4), Vector3.new(0.2, 2.6, size - 8) },
+		}
+	do
+		Models.part({
+			Name = "WallBand",
+			Size = band[2],
+			CFrame = at(band[1]),
+			Color = BAND,
+			CanCollide = false,
+			CanQuery = false,
+			Parent = model,
+		})
+	end
+	for _, side in { -1, 1 } do
+		for z = -12, 20, 8 do
+			Models.part({
+				Name = "WallPost",
+				Size = Vector3.new(0.5, 7.2, 1),
+				CFrame = at(Vector3.new(side * (size / 2 + 0.2), 4.6, z)),
+				Color = Color3.fromRGB(255, 250, 242),
+				CanCollide = false,
+				CanQuery = false,
+				Parent = model,
+			})
+		end
+	end
+
 	-- Knee walls either side of the porch bay, low enough to leave the Showcase in plain sight.
 	for _, side in { -1, 1 } do
 		Models.part({
@@ -146,30 +192,208 @@ local function buildPlot(index: number, frame: CFrame, parent: Instance): Model
 	do
 		decor({ Name = "Trim", Size = trim[2], CFrame = at(trim[1]), Color = TRIM })
 	end
-	-- Rotating about Z lifts the +X end, so the slab on the -X side needs a positive angle and
-	-- the one on the +X side a negative one. Matching the sign to `side` builds a valley, which
-	-- is what this did at first: two red beams sagging in the middle instead of a roof.
+	-- A cottage behind the back wall, its front on the plaza, so the ring reads as a street of houses
+	-- with their yards rather than as eight open boxes; seen from the porch its roof rises over the
+	-- back wall. It replaces a gable that floated over the wall and read as red ribbons from the
+	-- plaza. The yard itself stays unroofed. Every visible piece is decoration (no collision, no
+	-- raycasts, so the camera never pops on it); one invisible block stops anyone walking into it.
+	local ROOF = WALL:Lerp(Color3.fromRGB(58, 40, 52), 0.55)
+	local GLASS = Color3.fromRGB(176, 226, 255)
+	local cHalf, cDepth, cHeight, cRise = 15, 10, 13, 7
+	local cBack = size / 2 -- the back wall's outer face; the cottage starts here
+	local cMid = cBack + cDepth / 2
+	local cFront = cBack + cDepth -- the face on the plaza
+	decor({
+		Name = "Cottage",
+		Size = Vector3.new(cHalf * 2, cHeight, cDepth),
+		CFrame = at(Vector3.new(0, cHeight / 2, cMid)),
+		Color = WALL,
+	})
+	Models.part({
+		Name = "CottageBlock",
+		Size = Vector3.new(cHalf * 2, cHeight, cDepth),
+		CFrame = at(Vector3.new(0, cHeight / 2, cMid)),
+		Transparency = 1,
+		Parent = model,
+	})
+	decor({
+		Name = "CottagePlinth",
+		Size = Vector3.new(cHalf * 2 + 0.6, 1.4, cDepth + 0.6),
+		CFrame = at(Vector3.new(0, 0.7, cMid)),
+		Color = BASE,
+	})
+	decor({
+		Name = "CottageBand",
+		Size = Vector3.new(cHalf * 2 + 0.8, 0.8, cDepth + 0.8),
+		CFrame = at(Vector3.new(0, cHeight, cMid)),
+		Color = TRIM,
+	})
+	for _, sx in { -1, 1 } do
+		for _, sz in { -1, 1 } do
+			decor({
+				Name = "CottageCorner",
+				Size = Vector3.new(0.9, cHeight, 0.9),
+				CFrame = at(Vector3.new(sx * cHalf, cHeight / 2, cMid + sz * cDepth / 2)),
+				Color = TRIM,
+			})
+		end
+	end
+	-- The roof: two slabs meeting at a ridge that runs front to back, with eaves past the walls.
+	-- Rotating about Z lifts a slab's +X end, so the -X slab takes the positive angle.
+	local eave = cHeight + 0.4
+	local run = cHalf + 1.2
+	local slope = math.atan2(cRise, run)
 	for _, side in { -1, 1 } do
 		decor({
-			Name = "Gable",
-			Size = Vector3.new(size / 2 + 2, 1.4, 9),
-			CFrame = at(Vector3.new(side * size / 4, wallTop + 1.6, size / 2 - 2.5))
-				* CFrame.Angles(0, 0, -side * 0.28),
-			Color = Color3.fromRGB(198, 92, 84),
+			Name = "Roof",
+			Size = Vector3.new(math.sqrt(run * run + cRise * cRise), 1.2, cDepth + 2.4),
+			CFrame = at(Vector3.new(side * run / 2, eave + cRise / 2, cMid)) * CFrame.Angles(0, 0, -side * slope),
+			Color = ROOF,
 		})
 	end
 	decor({
-		Name = "Ridge",
-		Size = Vector3.new(3, 1.5, 9.4),
-		CFrame = at(Vector3.new(0, wallTop + 4.4, size / 2 - 2.5)),
-		Color = Color3.fromRGB(176, 76, 70),
+		Name = "RoofRidge",
+		Size = Vector3.new(1.4, 1, cDepth + 2.6),
+		CFrame = at(Vector3.new(0, eave + cRise + 0.25, cMid)),
+		Color = Models.shade(ROOF, -0.2),
+	})
+	-- Gable ends: a wedge each side of the ridge, tall edge at the middle. A wedge is full height at
+	-- its local +Z, so turning it -90 degrees about Y puts that edge towards -X (the right half).
+	for _, z in { cBack + 0.3, cFront - 0.3 } do
+		for _, side in { -1, 1 } do
+			decor({
+				ClassName = "WedgePart",
+				Name = "Gable",
+				Size = Vector3.new(0.6, cRise + 0.4, cHalf),
+				CFrame = at(Vector3.new(side * cHalf / 2, cHeight + (cRise + 0.4) / 2, z))
+					* CFrame.Angles(0, -side * math.pi / 2, 0),
+				Color = WALL,
+			})
+		end
+	end
+	decor({
+		Name = "Chimney",
+		Size = Vector3.new(2.4, 7, 2.4),
+		CFrame = at(Vector3.new(8.5, eave + 3.2, cMid + 2)),
+		Color = BASE,
 	})
 	decor({
-		Name = "GableFace",
-		Size = Vector3.new(size - 16, 4.2, 0.6),
-		CFrame = at(Vector3.new(0, wallTop + 1.9, size / 2 - 0.9)),
-		Color = WALL,
+		Name = "ChimneyCap",
+		Size = Vector3.new(3, 0.6, 3),
+		CFrame = at(Vector3.new(8.5, eave + 6.9, cMid + 2)),
+		Color = TRIM,
 	})
+	-- The front on the plaza: a door, two windows with flower boxes, a round window in the gable
+	-- and the house name over the door.
+	decor({
+		Name = "FrontDoorFrame",
+		Size = Vector3.new(6.4, 9, 0.3),
+		CFrame = at(Vector3.new(0, 4.9, cFront + 0.15)),
+		Color = TRIM,
+	})
+	decor({
+		Name = "FrontDoor",
+		Size = Vector3.new(5, 8, 0.3),
+		CFrame = at(Vector3.new(0, 4.6, cFront + 0.3)),
+		Color = Color3.fromRGB(150, 98, 74),
+		Material = Enum.Material.Wood,
+	})
+	decor({
+		Name = "FrontKnob",
+		Shape = Enum.PartType.Ball,
+		Size = Vector3.one * 0.6,
+		CFrame = at(Vector3.new(1.6, 4.4, cFront + 0.55)),
+		Color = Color3.fromRGB(255, 214, 64),
+	})
+	for _, side in { -1, 1 } do
+		local x = side * 9.5
+		decor({
+			Name = "FrontWindowFrame",
+			Size = Vector3.new(6.2, 5.6, 0.3),
+			CFrame = at(Vector3.new(x, 7.4, cFront + 0.15)),
+			Color = TRIM,
+		})
+		decor({
+			Name = "FrontWindow",
+			Size = Vector3.new(5, 4.4, 0.3),
+			CFrame = at(Vector3.new(x, 7.4, cFront + 0.3)),
+			Color = GLASS,
+			Material = Enum.Material.Glass,
+			Transparency = 0.15,
+		})
+		decor({
+			Name = "FrontMullion",
+			Size = Vector3.new(0.3, 4.4, 0.35),
+			CFrame = at(Vector3.new(x, 7.4, cFront + 0.35)),
+			Color = TRIM,
+		})
+		decor({
+			Name = "FrontSill",
+			Size = Vector3.new(6.8, 0.45, 0.9),
+			CFrame = at(Vector3.new(x, 4.5, cFront + 0.45)),
+			Color = TRIM,
+		})
+		decor({
+			Name = "FlowerBox",
+			Size = Vector3.new(6, 1.2, 1.2),
+			CFrame = at(Vector3.new(x, 3.7, cFront + 0.7)),
+			Color = BASE,
+		})
+		for i = 1, 5 do
+			decor({
+				Name = "Flower",
+				Shape = Enum.PartType.Ball,
+				Size = Vector3.one * 0.9,
+				CFrame = at(Vector3.new(x - 3 + i, 4.5, cFront + 0.75)),
+				Color = if i % 2 == 0 then Color3.fromRGB(255, 150, 170) else Color3.fromRGB(255, 240, 150),
+			})
+		end
+	end
+	decor({
+		Name = "GableWindowFrame",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.3, 3.8, 3.8),
+		CFrame = at(Vector3.new(0, cHeight + 3, cFront + 0.1)) * CFrame.Angles(0, math.pi / 2, 0),
+		Color = TRIM,
+	})
+	decor({
+		Name = "GableWindow",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.3, 3, 3),
+		CFrame = at(Vector3.new(0, cHeight + 3, cFront + 0.2)) * CFrame.Angles(0, math.pi / 2, 0),
+		Color = GLASS,
+		Material = Enum.Material.Glass,
+	})
+	local frontSign = decor({
+		Name = "FrontSign",
+		Size = Vector3.new(13, 2.4, 0.4),
+		CFrame = at(Vector3.new(0, 10.5, cFront + 0.25)),
+		Color = TRIM,
+	})
+	nameSign(frontSign, Enum.NormalId.Back)
+	decor({
+		Name = "Doormat",
+		Size = Vector3.new(6, 0.3, 2.2),
+		CFrame = at(Vector3.new(0, 0.3, cFront + 1.2)),
+		Color = BASE,
+	})
+	-- Two small windows on the yard side, above the back wall.
+	for _, side in { -1, 1 } do
+		decor({
+			Name = "YardWindowFrame",
+			Size = Vector3.new(4.6, 3.4, 0.3),
+			CFrame = at(Vector3.new(side * 8, 10.8, cBack - 0.1)),
+			Color = TRIM,
+		})
+		decor({
+			Name = "YardWindow",
+			Size = Vector3.new(3.6, 2.4, 0.3),
+			CFrame = at(Vector3.new(side * 8, 10.8, cBack - 0.2)),
+			Color = GLASS,
+			Material = Enum.Material.Glass,
+			Transparency = 0.15,
+		})
+	end
 
 	-- A door and two windows on the inside face of the back wall.
 	decor({
@@ -212,7 +436,6 @@ local function buildPlot(index: number, frame: CFrame, parent: Instance): Model
 			Size = Vector3.new(1.4, 7, 1.4),
 			CFrame = at(Vector3.new(side * 16, 4.5, -19.5)),
 			Color = TRIM,
-			Material = Enum.Material.WoodPlanks,
 		})
 	end
 	decor({
@@ -220,56 +443,95 @@ local function buildPlot(index: number, frame: CFrame, parent: Instance): Model
 		Size = Vector3.new(34, 1.2, 1.6),
 		CFrame = at(Vector3.new(0, 8.4, -19.5)),
 		Color = TRIM,
-		Material = Enum.Material.WoodPlanks,
 	})
 	-- A step down off the porch, so the front edge is not a cliff.
 	decor({
 		Name = "Step",
 		Size = Vector3.new(16, 0.6, 3),
 		CFrame = at(Vector3.new(0, 0.9, -21.5)),
-		Color = Color3.fromRGB(230, 216, 190),
-		Material = Enum.Material.WoodPlanks,
+		Color = TRIM,
 	})
 
+	-- The treadle is the gameplay part (Wheel reads its position); the wheel stands over it.
 	local wheel = Models.part({
 		Name = "Wheel",
 		Shape = Enum.PartType.Cylinder,
 		Size = Vector3.new(0.4, Config.Wheel.radius * 2, Config.Wheel.radius * 2),
 		CFrame = at(LOCAL.wheel) * CFrame.Angles(0, 0, math.pi / 2),
-		Color = Color3.fromRGB(255, 214, 64),
-		Material = Enum.Material.SmoothPlastic,
+		Color = Color3.fromRGB(72, 66, 90),
 		Parent = model,
 	})
-	Models.part({
-		Name = "WheelRing",
-		Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(1, 11, 11),
-		CFrame = at(LOCAL.wheel + Vector3.new(0, 5.5, 4)) * CFrame.Angles(0, math.pi / 2, 0),
-		Color = Color3.fromRGB(255, 120, 100),
-		Transparency = 0.35,
-		CanCollide = false,
-		Parent = model,
-	})
-	-- The upright ring is the part that reads as the wheel; the flat disc is the treadle the
-	-- player stands on. The stand therefore belongs under the ring, not under the disc.
-	local ringAt = LOCAL.wheel + Vector3.new(0, 5.5, 4)
-	for _, side in { -1, 1 } do
-		decor({
-			Name = "WheelStand",
-			Size = Vector3.new(0.9, ringAt.Y - 1.3, 0.9),
-			CFrame = at(Vector3.new(ringAt.X + side * 6, (ringAt.Y + 1) / 2, ringAt.Z)),
-			Color = Color3.fromRGB(96, 86, 120),
-			Material = Enum.Material.Metal,
+	-- The hamster wheel: two rims of short segments joined by rungs, with spokes to a hub, on an
+	-- A-frame. The player on the treadle stands inside it. Rims, rungs, spokes and hub are one
+	-- tagged Model that the client spins while somebody is on the treadle (Wheels); the frame stays.
+	local radius, width = WHEEL_RADIUS, WHEEL_WIDTH
+	local centre = LOCAL.wheel + Vector3.new(0, 0.2 + radius, 0)
+	local rig = Instance.new("Model")
+	rig.Name = "WheelRig"
+	local function rigPart(props: { [string]: any }): BasePart
+		props.CanCollide = false
+		props.CanQuery = false
+		props.Parent = rig
+		return Models.part(props)
+	end
+	local segments = 16
+	local segmentLength = 2 * math.pi * radius / segments + 0.3
+	for _, z in { -width / 2, width / 2 } do
+		for i = 1, segments do
+			local theta = 2 * math.pi * (i - 0.5) / segments
+			rigPart({
+				Name = "Rim",
+				Size = Vector3.new(segmentLength, 0.6, 0.5),
+				CFrame = at(centre + Vector3.new(radius * math.cos(theta), radius * math.sin(theta), z))
+					* CFrame.Angles(0, 0, theta + math.pi / 2),
+				Color = WALL,
+			})
+		end
+		for i = 1, 6 do
+			local phi = 2 * math.pi * i / 6
+			rigPart({
+				Name = "Spoke",
+				Size = Vector3.new(radius, 0.3, 0.3),
+				CFrame = at(centre + Vector3.new(radius / 2 * math.cos(phi), radius / 2 * math.sin(phi), z))
+					* CFrame.Angles(0, 0, phi),
+				Color = TRIM,
+			})
+		end
+	end
+	for i = 1, segments, 2 do
+		local theta = 2 * math.pi * (i - 0.5) / segments
+		rigPart({
+			Name = "Rung",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(width, 0.34, 0.34),
+			CFrame = at(centre + Vector3.new((radius - 0.1) * math.cos(theta), (radius - 0.1) * math.sin(theta), 0))
+				* CFrame.Angles(0, math.pi / 2, 0),
+			Color = TRIM,
 		})
 	end
-	decor({
-		Name = "WheelHub",
-		Shape = Enum.PartType.Ball,
-		Size = Vector3.one * 1.8,
-		CFrame = at(ringAt),
-		Color = Color3.fromRGB(96, 86, 120),
-		Material = Enum.Material.Metal,
+	rig.PrimaryPart = rigPart({
+		Name = "Hub",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(width + 1.6, 1, 1),
+		CFrame = at(centre) * CFrame.Angles(0, math.pi / 2, 0),
+		Color = Color3.fromRGB(80, 74, 100),
 	})
+	rig:AddTag("SpinWheel")
+	rig.Parent = model
+	-- The A-frame: two legs a side, from the floor out to the axle.
+	for _, z in { -(width / 2 + 0.8), width / 2 + 0.8 } do
+		for _, sx in { -1, 1 } do
+			local foot = Vector3.new(centre.X + sx * 3.4, 1, centre.Z + z)
+			local top = Vector3.new(centre.X, centre.Y, centre.Z + z)
+			local d = top - foot
+			decor({
+				Name = "WheelLeg",
+				Size = Vector3.new(0.6, d.Magnitude, 0.6),
+				CFrame = at((foot + top) / 2) * CFrame.Angles(0, 0, math.atan2(-d.X, d.Y)),
+				Color = Color3.fromRGB(80, 74, 100),
+			})
+		end
+	end
 
 	local pedal = Instance.new("ProximityPrompt")
 	pedal.Name = "PedalPrompt"
@@ -287,7 +549,7 @@ local function buildPlot(index: number, frame: CFrame, parent: Instance): Model
 			Shape = Enum.PartType.Cylinder,
 			Size = Vector3.new(0.3, 6, 6),
 			CFrame = at(pos) * CFrame.Angles(0, 0, math.pi / 2),
-			Color = Color3.fromRGB(255, 196, 120),
+			Color = Color3.fromRGB(252, 240, 214),
 			Material = Enum.Material.SmoothPlastic,
 			Parent = model,
 		})
@@ -296,16 +558,16 @@ local function buildPlot(index: number, frame: CFrame, parent: Instance): Model
 		decor({
 			Name = "ShowcaseRing",
 			Shape = Enum.PartType.Cylinder,
-			Size = Vector3.new(0.18, 7.6, 7.6),
+			Size = Vector3.new(0.18, 6.7, 6.7),
 			CFrame = at(pos - Vector3.new(0, 0.16, 0)) * CFrame.Angles(0, 0, math.pi / 2),
-			Color = Color3.fromRGB(255, 214, 64),
-			Material = Enum.Material.Neon,
+			Color = Color3.fromRGB(236, 184, 64),
 		})
+		-- Only a holder for the spotlight: as a visible box it floated in mid air over the pad.
 		local spot = decor({
 			Name = "ShowcaseSpot",
-			Size = Vector3.new(1.6, 0.8, 1.6),
+			Size = Vector3.new(1, 1, 1),
 			CFrame = at(Vector3.new(pos.X, 7.6, pos.Z)),
-			Color = Color3.fromRGB(60, 54, 74),
+			Transparency = 1,
 		})
 		local beamLight = Instance.new("SpotLight")
 		beamLight.Face = Enum.NormalId.Bottom
@@ -315,44 +577,46 @@ local function buildPlot(index: number, frame: CFrame, parent: Instance): Model
 		beamLight.Color = Color3.fromRGB(255, 240, 210)
 		beamLight.Parent = spot
 	end
+	-- Porch lanterns: a lamp between a cap and a foot. Plain plastic rather than Neon, which bloomed
+	-- into a white box up close; the theft alarm still flashes them red (Showcase).
 	for _, pos in LOCAL.porchLights do
 		local light = Models.part({
 			Name = "PorchLight",
-			Size = Vector3.new(1, 1.4, 1),
+			Size = Vector3.new(0.9, 1.2, 0.9),
 			CFrame = at(pos),
 			Color = PORCH_LIGHT,
-			Material = Enum.Material.Neon,
+			Material = Enum.Material.SmoothPlastic,
 			CanCollide = false,
+			CastShadow = false,
 			Parent = model,
 		})
 		local glow = Instance.new("PointLight")
 		glow.Color = PORCH_LIGHT
 		glow.Range = 12
 		glow.Parent = light
+		for _, dy in { 0.75, -0.72 } do
+			decor({
+				Name = "LanternCap",
+				Size = Vector3.new(1.3, 0.3, 1.3),
+				CFrame = at(pos + Vector3.new(0, dy, 0)),
+				Color = Color3.fromRGB(70, 62, 84),
+			})
+		end
 	end
-	local cooldown = Models.part({
+	-- The raid-cooldown plaque hangs under the porch beam, hidden until a theft starts one.
+	local cooldown = decor({
 		Name = "CooldownSign",
-		Size = Vector3.one,
+		Size = Vector3.new(11, 1.8, 0.4),
 		CFrame = at(LOCAL.cooldownSign),
+		Color = Color3.fromRGB(214, 52, 52),
 		Transparency = 1,
-		CanCollide = false,
-		CanQuery = false,
-		Parent = model,
 	})
-	local cooldownGui = Instance.new("BillboardGui")
-	cooldownGui.Enabled = false
-	cooldownGui.Size = UDim2.fromOffset(220, 40)
-	cooldownGui.MaxDistance = 150
-	cooldownGui.Parent = cooldown
-	local cooldownText = Instance.new("TextLabel")
-	cooldownText.Name = "Text"
-	cooldownText.Size = UDim2.fromScale(1, 1)
-	cooldownText.BackgroundColor3 = Color3.fromRGB(200, 40, 40)
-	cooldownText.BackgroundTransparency = 0.15
-	cooldownText.Font = Enum.Font.FredokaOne
-	cooldownText.TextScaled = true
-	cooldownText.TextColor3 = Color3.new(1, 1, 1)
-	cooldownText.Parent = cooldownGui
+	for _, face in { Enum.NormalId.Front, Enum.NormalId.Back } do
+		local panel = Models.signFace(cooldown, face)
+		panel.BackgroundColor3 = Color3.fromRGB(150, 24, 30)
+		panel.Parent.Enabled = false
+		Models.signText(panel, "Line", "", Color3.new(1, 1, 1), UDim2.fromScale(0, 0), UDim2.fromScale(1, 1))
+	end
 
 	for slot, pos in LOCAL.incubators do
 		Models.part({
@@ -368,7 +632,7 @@ local function buildPlot(index: number, frame: CFrame, parent: Instance): Model
 			Shape = Enum.PartType.Cylinder,
 			Size = Vector3.new(1.1, 5.6, 5.6),
 			CFrame = at(pos - Vector3.new(0, 1.0, 0)) * CFrame.Angles(0, 0, math.pi / 2),
-			Color = Color3.fromRGB(96, 86, 120),
+			Color = BASE,
 		})
 		decor({
 			Name = "IncubatorDome",
@@ -397,7 +661,7 @@ local function buildPlot(index: number, frame: CFrame, parent: Instance): Model
 				Shape = Enum.PartType.Cylinder,
 				Size = Vector3.new(0.3, 5, 5),
 				CFrame = at(Vector3.new(x, 1.15, z)) * CFrame.Angles(0, 0, math.pi / 2),
-				Color = Color3.fromRGB(200, 185, 160),
+				Color = Color3.fromRGB(246, 238, 222),
 				Parent = model,
 			})
 			decor({
@@ -405,38 +669,39 @@ local function buildPlot(index: number, frame: CFrame, parent: Instance): Model
 				Shape = Enum.PartType.Cylinder,
 				Size = Vector3.new(0.2, 6.2, 6.2),
 				CFrame = at(Vector3.new(x, 1.0, z)) * CFrame.Angles(0, 0, math.pi / 2),
-				Color = Color3.fromRGB(176, 158, 130),
+				Color = BASE,
 			})
 		end
 	end
 
-	local sign = Models.part({
+	-- The house name on a board standing on the porch beam, framed in the house's own colour and
+	-- printed on both faces: outward for anyone coming in off the field, inward for the owner.
+	local sign = decor({
 		Name = "OwnerSign",
-		Size = Vector3.one,
-		CFrame = at(Vector3.new(0, 15, -6)),
-		Transparency = 1,
-		CanCollide = false,
-		CanQuery = false,
-		Parent = model,
+		Size = Vector3.new(16, 3.4, 0.5),
+		CFrame = at(Vector3.new(0, 9 + 1.7, -19.5)),
+		Color = WALL,
 	})
-	local gui = Instance.new("BillboardGui")
-	gui.Size = UDim2.fromOffset(280, 50)
-	-- Eight houses stand in a ring, so a long range stacks every label into one smear.
-	gui.MaxDistance = 140
-	gui.Parent = sign
-	local text = Instance.new("TextLabel")
-	text.Name = "Text"
-	text.Size = UDim2.fromScale(1, 1)
-	text.Font = Enum.Font.FredokaOne
-	text.TextScaled = true
-	text.TextColor3 = Color3.new(1, 1, 1)
-	text.Text = "Empty lot"
-	text.Parent = gui
-	-- Rimmed in this house's own colour, so the nameplate and the walls agree.
-	Models.pill(text, WALL)
+	nameSign(sign, Enum.NormalId.Front)
+	nameSign(sign, Enum.NormalId.Back)
 
 	model.Parent = parent
 	return model
+end
+
+-- Shows `value` on a plot's raid-cooldown plaque, or hides the plaque when it is nil.
+function Plots.setCooldown(index: number, value: string?)
+	local board = Plots.part(index, "CooldownSign")
+	board.Transparency = if value then 0 else 1
+	for _, gui in board:GetChildren() do
+		if gui:IsA("SurfaceGui") then
+			gui.Enabled = value ~= nil
+			local line = gui:FindFirstChild("Line", true) :: TextLabel?
+			if line and value then
+				line.Text = value
+			end
+		end
+	end
 end
 
 function Plots.frame(index: number): CFrame
@@ -525,7 +790,7 @@ function Plots.start()
 		end
 		if state and not state.plot then
 			task.delay(2, function()
-				Remotes.get("Toast"):FireClient(player, Strings.Toasts.noPlot)
+				Notify.toast(player, "noPlot")
 			end)
 		end
 		player.CharacterAdded:Connect(function(character)

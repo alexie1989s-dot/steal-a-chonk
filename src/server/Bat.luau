@@ -8,6 +8,7 @@ local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local Strings = require(ReplicatedStorage.Shared.Strings)
 local Carry = require(script.Parent.Carry)
 local Models = require(script.Parent.Models)
+local Notify = require(script.Parent.Notify)
 local PlayerState = require(script.Parent.PlayerState)
 
 local Bat = {
@@ -26,19 +27,9 @@ local function bonk(at: Vector3)
 		CanQuery = false,
 		Parent = workspace,
 	})
-	local gui = Instance.new("BillboardGui")
-	gui.Size = UDim2.fromOffset(160, 60)
-	gui.AlwaysOnTop = true
+	local gui = Models.worldLabel("Bonk", Vector2.new(4.5, 1.8), Vector2.new(40, 16), 0, 120)
+	Models.shout(gui, Strings.Bat.bonk, Color3.fromRGB(255, 214, 64))
 	gui.Parent = anchor
-	local label = Instance.new("TextLabel")
-	label.Size = UDim2.fromScale(1, 1)
-	label.BackgroundTransparency = 1
-	label.Font = Enum.Font.FredokaOne
-	label.TextScaled = true
-	label.TextColor3 = Color3.fromRGB(255, 214, 64)
-	label.TextStrokeTransparency = 0.2
-	label.Text = Strings.Bat.bonk
-	label.Parent = gui
 	task.delay(1, function()
 		anchor:Destroy()
 	end)
@@ -90,9 +81,8 @@ function Bat.swing(player: Player): Player?
 	if targetRoot then
 		bonk(targetRoot.Position)
 	end
-	local toast = Remotes.get("Toast")
-	toast:FireClient(target, Strings.Toasts.batted)
-	toast:FireClient(player, Strings.Toasts.youBatted)
+	Notify.toast(target, "batted")
+	Notify.toast(player, "youBatted")
 	return target
 end
 

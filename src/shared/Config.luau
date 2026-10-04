@@ -159,6 +159,17 @@ Config.Base = {
 }
 
 -- Burrito glow and card band colours by tier (RGB 0..255). Slice proposal.
+-- Scenery packs published by Roblox and licensed for use in any Roblox game (user ruling 2026-10-04).
+-- Loaded by id at boot, so the repository holds ids, not the models. If a pack does not arrive within
+-- loadTimeout seconds the world is built from parts instead, as it was before.
+Config.Props = {
+	packs = {
+		nature = 6933438443, -- Synty Nature Pack
+		city = 6933556508, -- Synty City Pack
+	},
+	loadTimeout = 12,
+}
+
 Config.TierColors = {
 	Common = { 210, 210, 210 },
 	Uncommon = { 110, 205, 110 },

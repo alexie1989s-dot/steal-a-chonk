@@ -1,6 +1,145 @@
 # Current handoff
 
-Updated: 2026-10-04 by Claude Code. The vertical-slice greybox prototype was built on 2026-09-24; the Showcase heist (Alpha step 1) was built on top of it on 2026-09-27; the presentation pass landed on 2026-09-29. The Codex art notes further down (2026-09-07) are history: art is paused during the prototype.
+Updated: 2026-10-04 by Claude Code (heavy visual pass on top of sound, licensed props and UI polish; committed and pushed). The vertical-slice greybox prototype was built on 2026-09-24; the Showcase heist (Alpha step 1) was built on top of it on 2026-09-27; the presentation pass landed on 2026-09-29. The Codex art notes further down (2026-09-07) are history: art is paused during the prototype.
+
+## 2026-10-04 Heavy visual pass: world text, cottages, wheel, clean-up (Claude Code)
+
+The user asked for heavy visual polish. Text rendered badly at a distance and looked misaligned,
+and the whole thing looked sloppy. This pass was done by looking: the user restored the Studio
+window, and every change was captured and judged on screen. Committed and pushed in one commit
+with the sound and props work in the next section.
+
+**Found in the baseline screenshots, before any change:**
+
+- **World labels:**
+  - Every label was sized in pixels, so a far "Empty lot" plate or name tag stayed full size,
+    swamped what it named and piled onto its neighbours.
+  - Name tags were depth-tested, so the wheel stand, the pergola beam and the player's own head
+    sliced them.
+  - The BACKYARDS billboard was cut in half by its own board ("‹YARDS").
+  - A house plate covered the Practice House sign.
+- **Scenery:**
+  - Half the Synty trees are autumn-coloured.
+  - Dark "patch" discs under every field prop read as stickers.
+  - Neon lamp globes and porch lights bloomed into white blobs.
+  - The hamster wheel was a see-through salmon disc.
+  - A navy spotlight box floated over each porch pad.
+  - The gable over each back wall read as red ribbons from the plaza.
+  - The benches faced outward.
+  - A default studded spawn tile sat in the plaza.
+- **UI:**
+  - The sound button sat under Roblox's player list.
+  - Luckiest Guy turned "Pedal!" into "PeDAL!".
+  - The reveal card's rays covered the whole screen.
+
+**Changed:**
+
+| Area | Change |
+| --- | --- |
+| World labels | New `Models.worldLabel` builder. Size is part studs (shrinks with distance) and part pixels (a floor that keeps it legible). Each label hangs by its bottom edge (`SizeOffset (0, 0.5)`, `StudsOffsetWorldSpace`), uses `AlwaysOnTop` and `LightInfluence 0`, and is filled before it is parented, so it replicates whole. Name tags have two lines on a dark plate with a tier-coloured rim: a tier-tinted name and a green income. Unwrap timers show an hourglass and the seconds. BONK and MRRP use `Models.shout`: heavy outlined capitals |
+| Name-tag thinning | `NameTags` fades every part of the new plates and projects the bottom-edge hang correctly. Over the last fifth of its range a tag fades out instead of popping |
+| Signs | `Models.signFace` and `signText` print onto boards (SurfaceGui, canvas capped near 1000 px). The house name sits on a board on the porch beam (both faces) and over each cottage door. The raid cooldown is a red plaque under the beam, shown by the new `Plots.setCooldown`. The Practice House sign stands on its roof edge, and BACKYARDS is printed on both faces of its board |
+| Houses | **A cottage behind every back wall, facing the plaza:** walls, plinth, corner boards, a pitched roof with ridge and eaves, gable ends, a chimney, a door, two windows with flower boxes, a round gable window and windows on the yard side. Its visible parts never collide, so the camera doesn't pop on them; one invisible block stops anyone walking in. It replaces the floating gable. Other house changes: yard walls in two tones with posts; pergola, posts and step in smooth trim instead of noisy white planks; porch pads cream with a thin gold rim and no Neon; Vault pads and incubator bases on the house's darker shade; porch lights now lanterns on the knee walls |
+| Hamster wheel | Two segmented rims, rungs, spokes, a hub and an A-frame over the treadle, in the house colour. The new client `Wheels` spins it while anyone stands on the treadle |
+| Field and plaza | Green trees only, picked from a lineup of all 30 candidates in the field. No patch discs. Benches now face the plaza. Street lamps are lanterns with no Neon. A fountain on a stone ring replaces the yellow target, and the spawn tile is invisible |
+| UI | The sound button moved to the left edge. Prompt actions and `Ui` button labels are set in capitals. The HUD chips carry 💰 ⚡ 👟. The reveal card's rays stay faint and close to the card, and the size stamp moved onto the portrait's corner and resets between cards |
+| Grade | ColorCorrection saturation 0.38 → 0.22 and contrast 0.2 → 0.14. Bloom 0.5/20/1.95 → 0.3/24/2.2. ShadowSoftness 0.25 → 0.45. Set in `default.project.json` and patched into the open place |
+
+**Verified in Studio (solo play, real window captures):**
+
+- **Views captured:** the plaza (a street of cottages, every sign readable), the yard from the
+  porch, the porch with the raid plaque counting down, the field, a nest with the GRAB prompt,
+  the bench and lamp, and the reveal card.
+- **UI captured:** name tags close and far, the PEDAL! prompt, the toast stack and the HUD icons.
+- **Boot and checks:** a clean boot every time. 86 Lune tests, `stylua --check`, `selene src`
+  and `rojo build` all pass.
+- **Part count:** the workspace is at 3159 parts. It was 2525 after the props pass and 4080
+  before it.
+
+**Not verified:**
+
+- **Wheel spin:** only stills were taken, so the turning is unseen.
+- **Porch lanterns in their final spot:** they were moved onto the knee walls last, and the final
+  Studio restart hung ("Start play hasn't finished yet") before a capture. The previous position
+  had them sunk inside the wall.
+- **Practice House trim:** not captured up close.
+- **Untested as before:** BONK (needs two players), MRRP in a frame, touch and phones (the Bat
+  button, prompt taps, label sizes on a small screen). The sounds are still unheard.
+
+**Tooling: read this before taking screenshots**
+
+- **The capture tool misses some labels.** Studio's MCP `screen_capture` does not draw
+  always-on-top billboards: custom prompts, name tags, BONK. It made the prompts look broken.
+  Grab the Studio window's real pixels instead with `PrintWindow` (flag
+  `PW_RENDERFULLCONTENT = 2`, user32). That works behind other windows but not while Studio is
+  minimised. A local script for it is in `.claude/tools/studio/snap.ps1`.
+- **A scriptable camera resets when its script ends.** A camera set from `execute_luau` reverts
+  to Custom once the script finishes. Start the capture in the background with a delay, then run a
+  script that holds the camera in a loop for longer than that delay.
+- **Tool status:** the native Studio MCP tools load in Claude Code again. `sync.py` still goes
+  through the local bridge.
+
+**Next step:** restart the playtest and take one look at the porch lanterns and a spinning wheel.
+After that it is the user's call: publish to a private place for the mates, or carry on with the
+Alpha.
+
+## 2026-10-04 Sound, licensed props, new buttons, toasts and prompts (Claude Code)
+
+The user asked to polish menu buttons, notifications and props with free assets from Roblox
+itself. They ruled for engine built-ins plus Roblox-official assets, and for sound from Roblox's
+library. See `PROJECT_CONTEXT.md` for the ruling and what it does not allow. Committed with the
+visual pass above.
+
+**What changed:**
+
+| Area | Change |
+| --- | --- |
+| Sound | New shared `Sounds` catalogue of 18 sounds: 9 from Roblox's own `Roblox_UI_*` and `Roblox GUI - *` sets, 9 from Roblox's licensed APM and Pro Sound Effects library. New client `Sfx` plays them through a SoundGroup and owns the mute switch |
+| Toasts | Every toast now carries a tone and a sound (`Sounds.Toasts`, `Sounds.Theft`), sent through the new server `Notify` module. It replaces four identical `toast` helpers and the direct `FireClient` calls in Bat, Guardians, Plots and Carry. `Toast` gains `(text, tone, sound)`, and there is a new `Sfx` remote |
+| Toast look | The single toast line is now a stack of up to three cards under the stat bar, newest on top. Each has a tone-coloured rim and an emoji icon chip (good ✨, bad 💥, alert 🚨, info 🐾), fades as one (CanvasGroup), and stays up longer for long messages |
+| Moments | Grab: pop. Refusals: soft "no". Caught or batted: comic doink. Stash or porch: cash register. Unwrap: paper swipe. Made it home: victory sting. Thief: sly organ sting. Victim: car-alarm chirp |
+| Porch alarm | `soundAlarm` finally sounds: a car alarm plays in the world at the robbed porch for the 6 s the lights blink, so the thief hears it too. It stops with the lights, and when the owner leaves. Clients put it in their Sfx group, so mute covers it |
+| Reveal card | Whoosh on entry, a sting (the bigger one for Epic and up, or size 6), a thump when the size stamp lands, a click on dismiss |
+| Buttons | New client `Ui.button`: coloured face with a sheen, ink outline, drop shadow, Luckiest Guy label, hover and press squash, click sound. Used for a **sound on/off button** (top right) and a **touch Bat button** that replaces Roblox's grey one. F and gamepad X are unchanged |
+| Prompts | New client `Prompts`: every ProximityPrompt is switched to the Custom style on the client and drawn as a dark pill with a gold key chip (E, X or a tap emoji), the action in Luckiest Guy, the object name above, and a fill that tracks the 1.5 s Steal hold. Tap and click still work the prompt. Input and every server check are unchanged |
+| Props | New server `Props` loads the Roblox-published Synty Nature and City packs at boot, by id, with a 12 s limit and part fallbacks. Field trees, rocks, bushes, flower patches, the hedge obstacles and the boundary woods now use Synty meshes. Added 18 clouds above the far ridge, and a bench, bin and planter in each of the 8 gaps between houses |
+
+**Verified in Studio (solo play, by inspecting instances, as the window was minimised):**
+
+- Clean boot: only the two boot lines, once the broken leaf-card meshes were filtered out.
+- All 18 sounds load (`IsLoaded`, lengths 0.13 to 12 s) both in Edit and on the client.
+- 52 prompts read `Custom` on the client. Standing at the wheel drew the custom billboard: key E,
+  "Pedal!" in Luckiest Guy, "Hamster Wheel" above.
+- A client recorder saw each toast arrive with its tone and sound: unwrapping (good, unwrap), a
+  refusal (info, nope), on the porch (good, cash), the theft (alert, robbed), the Chonk coming home
+  (good, good), the guardian catch (bad, bonk). The real Grab path (`grabItem` → `Carry.grab`)
+  sent the pop. DevHooks' nest `grab` calls `pickUp` directly and does not.
+- `robMe`: the `Alarm` sound on Plot1's porch light was playing, was stopped 6.5 s later, and sat in
+  the client's `Sfx` SoundGroup.
+- Scenery: 701 meshes in the field dressing, none floating, nothing colliding except the 72
+  boundary walls. Workspace parts went from 4,080 to 2,525.
+- 86 Lune tests (3 new in a `Sounds` suite: catalogue entries and sources, and a style for every
+  toast and theft message), `stylua --check`, `selene src` and `rojo build` pass.
+
+**Not verified:**
+
+- **Nobody has looked at any of it** (looked at since, in the visual pass above; the sounds are still unheard). Studio stayed minimised, so screenshots came back black, and
+  the user chose to skip the visual check. Unknowns: which way the Synty bench faces (the code
+  assumes its front looks at the district centre), whether the clouds sit well above the ridge,
+  how the Synty meshes sit next to the part-built houses, and how the toasts, prompts and buttons
+  look on screen, including whether the emoji render.
+- **Nobody has listened to the sounds.** They were picked from names, descriptions and lengths.
+  `pop` is 2.7 s long and `info` 3 s, which may be too long.
+- The touch Bat button and the prompt tap path were not exercised (they need touch input). Mobile
+  is still untested overall.
+
+**Tooling note:** Rojo was not running, so sources went in with `.claude/tools/studio/sync.py`
+through the local bridge (`studio-bridge.js` started with the current `StudioMCP.exe`). The native
+Studio MCP tools load in Claude Code again, alongside the bridge.
+
+**Next step:** someone looks at it and listens to it, with Studio restored or in a published
+place. Fix the bench direction and the cloud height if they are off and swap any sound that grates.
+Then commit, with the README updated in the same push.
 
 ## 2026-10-04 Name tags thinned; the unwrap card rebuilt (Claude Code)
 

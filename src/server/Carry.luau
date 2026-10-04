@@ -12,6 +12,7 @@ local ShowcaseRules = require(ReplicatedStorage.Shared.ShowcaseRules)
 local Signal = require(ReplicatedStorage.Shared.Signal)
 local Strings = require(ReplicatedStorage.Shared.Strings)
 local Movement = require(script.Parent.Movement)
+local Notify = require(script.Parent.Notify)
 local PlayerState = require(script.Parent.PlayerState)
 
 export type Item = {
@@ -50,12 +51,7 @@ local function rootOf(player: Player): BasePart?
 end
 Carry.rootOf = rootOf
 
-local function toast(player: Player, key: string)
-	local text = Strings.Toasts[key]
-	if text then
-		Remotes.get("Toast"):FireClient(player, text)
-	end
-end
+local toast = Notify.toast
 
 local function setPhysics(model: Model, anchored: boolean)
 	for _, part in model:GetDescendants() do
@@ -132,7 +128,9 @@ function Carry.grab(player: Player, item: Item): (boolean, string?)
 	if item.status == "ready" or item.status == "loose" then
 		ok, reason = Carry.pickUp(player, item)
 	end
-	if not ok and reason then
+	if ok then
+		Notify.sound(player, "pop")
+	elseif reason then
 		toast(player, reason)
 	end
 	return ok, reason
@@ -332,7 +330,7 @@ function Carry.start()
 						if inBase and state.carrying then
 							Carry.CrossedHome:Fire(player, state.carrying)
 							Remotes.get("Celebrate"):FireClient(player)
-							Remotes.get("Toast"):FireClient(player, Strings.Toasts.madeItHome)
+							Notify.toast(player, "madeItHome")
 						end
 					end
 				end

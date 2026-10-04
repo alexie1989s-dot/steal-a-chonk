@@ -625,78 +625,214 @@ function Models.burrito(tier: string, size: number): Model
 	return model
 end
 
--- The house style for world text: a dark rounded plate with an accent rim. Floating outlined text
--- vanished against bright grass, a pale wall or the sky, depending on where the player stood; a
--- plate reads the same from every angle, which is what the genre does with every world label.
-function Models.pill(gui: GuiObject, accent: Color3, radius: number?)
-	gui.BackgroundColor3 = Color3.fromRGB(26, 22, 38)
-	gui.BackgroundTransparency = 0.18
+-- World text. Two kinds, and nothing else floats in the world:
+--
+-- * Labels (Chonk name tags, unwrap timers) are billboards sized partly in studs and partly in
+--   pixels. The stud part shrinks with distance like the thing labelled; the pixel part is a floor,
+--   so a far label stays legible. Pure pixel sizes kept one size at every range, so a far tag
+--   swamped its Chonk and piled onto its neighbours. Labels hang by their bottom edge above the
+--   object, straight up in world space, and draw on top so a wall or a beam never slices the text.
+-- * Signs (house names, the practice house, the zone board, the raid cooldown) are printed onto a
+--   face of a real board with a SurfaceGui, so the words sit on the world instead of in front of it.
+local LABEL_INK = Color3.fromRGB(24, 20, 36)
+local MONEY = Color3.fromRGB(134, 236, 110)
+Models.LABEL_INK = LABEL_INK
+
+local function round(gui: GuiObject, radius: UDim)
 	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, radius or 12)
+	corner.CornerRadius = radius
 	corner.Parent = gui
-	local stroke = Instance.new("UIStroke")
-	stroke.Color = accent
-	stroke.Thickness = 2
-	stroke.Transparency = 0.35
-	stroke.Parent = gui
-	local pad = Instance.new("UIPadding")
-	pad.PaddingLeft = UDim.new(0, 10)
-	pad.PaddingRight = UDim.new(0, 10)
-	pad.PaddingTop = UDim.new(0, 4)
-	pad.PaddingBottom = UDim.new(0, 4)
-	pad.Parent = gui
 end
 
--- A floating countdown above an incubator or porch pad. Destroy its BillboardGui (label.Parent) when done.
-function Models.progressLabel(parent: BasePart): TextLabel
-	local gui = Instance.new("BillboardGui")
-	gui.Name = "Unwrap"
-	gui.Size = UDim2.fromOffset(150, 40)
-	gui.StudsOffset = Vector3.new(0, 5, 0)
-	gui.Parent = parent
+local function outline(gui: GuiObject, color: Color3, thickness: number, transparency: number?)
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = color
+	stroke.Thickness = thickness
+	stroke.Transparency = transparency or 0
+	stroke.ApplyStrokeMode = if gui:IsA("TextLabel")
+		then Enum.ApplyStrokeMode.Contextual
+		else Enum.ApplyStrokeMode.Border
+	stroke.Parent = gui
+end
+
+local function text(parent: Instance, name: string, props: { [string]: any }): TextLabel
 	local label = Instance.new("TextLabel")
-	label.Size = UDim2.fromScale(1, 1)
-	label.BackgroundColor3 = Color3.fromRGB(34, 30, 46)
-	label.BackgroundTransparency = 0.15
+	label.Name = name
+	label.BackgroundTransparency = 1
 	label.Font = Enum.Font.FredokaOne
 	label.TextScaled = true
 	label.TextColor3 = Color3.new(1, 1, 1)
-	label.Parent = gui
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(1, 0)
-	corner.Parent = label
-	local stroke = Instance.new("UIStroke")
-	stroke.Color = Color3.fromRGB(255, 214, 64)
-	stroke.Thickness = 2
-	stroke.Transparency = 0.25
-	stroke.Parent = label
-	local pad = Instance.new("UIPadding")
-	pad.PaddingLeft = UDim.new(0, 10)
-	pad.PaddingRight = UDim.new(0, 10)
-	pad.Parent = label
+	for key, value in props do
+		(label :: any)[key] = value
+	end
+	label.Parent = parent
 	return label
 end
 
--- A name tag floating `offsetY` studs above a model's PrimaryPart. `maxDistance` sets how far
--- off it stays readable: a Vault shelf packs ten pads seven studs apart, and at the default
--- range all ten tags overlap into one unreadable smear, so callers with crowded pads pass less.
-function Models.nameLabel(model: Model, text: string, color: Color3, offsetY: number, maxDistance: number?): TextLabel
+local function capText(label: TextLabel, max: number)
+	local cap = Instance.new("UITextSizeConstraint")
+	cap.MaxTextSize = max
+	cap.MinTextSize = 8
+	cap.Parent = label
+end
+
+-- A world label anchored `offsetY` studs above whatever it is parented to, sized `studs` + `pixels`.
+-- Returned unparented: callers fill it and parent it last, so it replicates whole.
+local function label(name: string, studs: Vector2, pixels: Vector2, offsetY: number, range: number): BillboardGui
 	local gui = Instance.new("BillboardGui")
-	gui.Name = "NameTag"
-	gui.Size = UDim2.fromOffset(232, 64)
-	gui.StudsOffset = Vector3.new(0, offsetY, 0)
-	gui.MaxDistance = maxDistance or 80
+	gui.Name = name
+	gui.Size = UDim2.new(studs.X, pixels.X, studs.Y, pixels.Y)
+	gui.SizeOffset = Vector2.new(0, 0.5) -- hang by the bottom edge
+	gui.StudsOffsetWorldSpace = Vector3.new(0, offsetY, 0)
+	gui.AlwaysOnTop = true
+	gui.LightInfluence = 0
+	gui.MaxDistance = range
+	gui.ResetOnSpawn = false
+	return gui
+end
+Models.worldLabel = label
+
+-- The plate every label sits on: dark, rounded, rimmed in an accent colour.
+local function plate(parent: Instance, accent: Color3): Frame
+	local frame = Instance.new("Frame")
+	frame.Name = "Plate"
+	frame.Size = UDim2.fromScale(1, 1)
+	frame.BackgroundColor3 = LABEL_INK
+	frame.BackgroundTransparency = 0.12
+	frame.BorderSizePixel = 0
+	frame.Parent = parent
+	round(frame, UDim.new(0.32, 0))
+	outline(frame, accent, 2.5, 0.05)
+	return frame
+end
+
+-- A floating countdown above an incubator or porch pad: an hourglass and the seconds left on a
+-- gold-rimmed plate. Callers set the returned label's Text and destroy its BillboardGui
+-- (label.Parent) when done, which takes the plate and the icon with it.
+function Models.progressLabel(parent: BasePart): TextLabel
+	local gui = label("Unwrap", Vector2.new(1.9, 0.75), Vector2.new(46, 18), 3.2, 70)
+	plate(gui, Color3.fromRGB(255, 214, 64))
+	local icon = text(gui, "Icon", {
+		Position = UDim2.fromScale(0.08, 0.12),
+		Size = UDim2.fromScale(0.3, 0.76),
+		Text = utf8.char(0x23F3),
+	})
+	capText(icon, 24)
+	local time = text(gui, "Time", {
+		Position = UDim2.fromScale(0.36, 0.12),
+		Size = UDim2.fromScale(0.54, 0.76),
+		TextXAlignment = Enum.TextXAlignment.Left,
+	})
+	capText(time, 26)
+	outline(time, LABEL_INK, 1.5)
+	gui.Parent = parent
+	return time
+end
+
+-- A Chonk's name tag, hanging `offsetY` studs above the model's body. `text` is the name, then
+-- optionally a newline and a detail line (the income). Tier-coloured: the rim and the name.
+-- `maxDistance` sets its range: a Vault packs ten pads close together, so callers there pass less.
+function Models.nameLabel(
+	model: Model,
+	content: string,
+	color: Color3,
+	offsetY: number,
+	maxDistance: number?
+): TextLabel
+	local name, detail = string.match(content, "^(.-)\n(.*)$")
+	name = name or content
+	local twoLines = detail ~= nil and detail ~= ""
+	local gui = label(
+		"NameTag",
+		Vector2.new(2.3, if twoLines then 0.62 else 0.42),
+		Vector2.new(96, if twoLines then 28 else 18),
+		offsetY,
+		maxDistance or 80
+	)
+	local back = plate(gui, color)
+	local pad = Instance.new("UIPadding")
+	pad.PaddingLeft = UDim.new(0.07, 0)
+	pad.PaddingRight = UDim.new(0.07, 0)
+	pad.PaddingTop = UDim.new(0.08, 0)
+	pad.PaddingBottom = UDim.new(0.1, 0)
+	pad.Parent = back
+	local nameLabel = text(back, "Name", {
+		Size = UDim2.fromScale(1, if twoLines then 0.58 else 1),
+		Text = name,
+		TextColor3 = color:Lerp(Color3.new(1, 1, 1), 0.3),
+	})
+	capText(nameLabel, 30)
+	outline(nameLabel, LABEL_INK, 1.5)
+	if twoLines then
+		local detailLabel = text(back, "Detail", {
+			Position = UDim2.fromScale(0, 0.6),
+			Size = UDim2.fromScale(1, 0.4),
+			Text = detail,
+			TextColor3 = MONEY,
+		})
+		capText(detailLabel, 22)
+	end
 	gui.Parent = model.PrimaryPart
-	local label = Instance.new("TextLabel")
-	label.Size = UDim2.fromScale(1, 1)
-	label.Font = Enum.Font.FredokaOne
-	label.TextScaled = true
-	label.TextColor3 = color
-	label.Text = text
-	label.Parent = gui
-	-- Rimmed in the tier colour, so rarity reads from across the district.
-	Models.pill(label, color)
-	return label
+	return nameLabel
+end
+
+-- A one-word shout over the action (BONK, MRRP): heavy display type with a thick ink outline, no
+-- plate, so it reads as a sound effect rather than as a label.
+function Models.shout(gui: BillboardGui, word: string, color: Color3): TextLabel
+	local line = text(gui, "Shout", {
+		Size = UDim2.fromScale(1, 1),
+		Font = Enum.Font.LuckiestGuy,
+		Text = string.upper(word),
+		TextColor3 = color,
+	})
+	outline(line, LABEL_INK, 3)
+	return line
+end
+
+-- A printed sign: a SurfaceGui on one face of `board`, holding a dark panel inset from the board's
+-- edges so the board itself shows round it as a frame in its own colour. Returns the panel for the
+-- caller's text. Faces lit at a quarter strength, so a sign in shade still reads but is not a lamp.
+function Models.signFace(board: BasePart, face: Enum.NormalId): Frame
+	local gui = Instance.new("SurfaceGui")
+	gui.Name = `Sign{face.Name}`
+	gui.Face = face
+	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	-- Sharp on a small board, capped near 1000 pixels across on a big one.
+	local across = if face == Enum.NormalId.Left or face == Enum.NormalId.Right then board.Size.Z else board.Size.X
+	gui.PixelsPerStud = math.min(50, 1000 / across)
+	gui.LightInfluence = 0.25
+	gui.MaxDistance = 500
+	gui.Parent = board
+	local panel = Instance.new("Frame")
+	panel.Name = "Panel"
+	panel.AnchorPoint = Vector2.new(0.5, 0.5)
+	panel.Position = UDim2.fromScale(0.5, 0.5)
+	panel.Size = UDim2.new(1, -18, 1, -18)
+	panel.BackgroundColor3 = LABEL_INK
+	panel.BorderSizePixel = 0
+	panel.Parent = gui
+	round(panel, UDim.new(0, 10))
+	local pad = Instance.new("UIPadding")
+	pad.PaddingLeft = UDim.new(0, 14)
+	pad.PaddingRight = UDim.new(0, 14)
+	pad.PaddingTop = UDim.new(0, 8)
+	pad.PaddingBottom = UDim.new(0, 8)
+	pad.Parent = panel
+	return panel
+end
+
+-- A line of sign text filling `size` of a sign panel, positioned at `position`.
+function Models.signText(
+	panel: Frame,
+	name: string,
+	value: string,
+	color: Color3,
+	position: UDim2,
+	size: UDim2
+): TextLabel
+	local line = text(panel, name, { Position = position, Size = size, Text = value, TextColor3 = color })
+	outline(line, Color3.new(0, 0, 0), 2, 0.4)
+	return line
 end
 
 -- The Mama Chonk guardian. Body rolls; ears, eyes and brow keep an upright offset (the "Offset"

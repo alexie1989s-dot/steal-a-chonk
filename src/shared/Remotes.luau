@@ -7,10 +7,11 @@ local Remotes = {}
 
 -- BatSwing: client → server, no arguments.
 -- Reveal: server → client, (card payload table, the Chonk's model or nil).
--- Toast: server → client, (text).
+-- Toast: server → client, (text, tone or nil, Sounds key or nil).
+-- Sfx: server → client, (Sounds key).
 -- Knockback: server → client, (dirX, dirZ).
 -- Celebrate: server → client, no arguments.
-Remotes.Names = { "BatSwing", "Reveal", "Toast", "Knockback", "Celebrate" }
+Remotes.Names = { "BatSwing", "Reveal", "Toast", "Sfx", "Knockback", "Celebrate" }
 
 local function folder(): Instance
 	if RunService:IsServer() then

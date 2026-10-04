@@ -5,11 +5,11 @@ local RunService = game:GetService("RunService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local GuardianBrain = require(ReplicatedStorage.Shared.GuardianBrain)
-local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local Strings = require(ReplicatedStorage.Shared.Strings)
 local Carry = require(script.Parent.Carry)
 local Models = require(script.Parent.Models)
 local Nests = require(script.Parent.Nests)
+local Notify = require(script.Parent.Notify)
 
 type Guardian = {
 	index: number,
@@ -31,22 +31,10 @@ function Guardians.all(): { Guardian }
 end
 
 local function wakeBubble(body: BasePart): BillboardGui
-	local gui = Instance.new("BillboardGui")
-	gui.Name = "Mrrp"
-	gui.Size = UDim2.fromOffset(160, 60)
-	gui.StudsOffset = Vector3.new(0, Config.Guardian.radius + 2.5, 0)
-	gui.AlwaysOnTop = true
+	local gui = Models.worldLabel("Mrrp", Vector2.new(5, 2), Vector2.new(40, 16), Config.Guardian.radius + 1, 160)
+	Models.shout(gui, Strings.Guardian.wake, Color3.fromRGB(255, 120, 100))
 	gui.Enabled = false
 	gui.Parent = body
-	local label = Instance.new("TextLabel")
-	label.Size = UDim2.fromScale(1, 1)
-	label.BackgroundTransparency = 1
-	label.Font = Enum.Font.FredokaOne
-	label.TextScaled = true
-	label.TextColor3 = Color3.fromRGB(255, 120, 100)
-	label.TextStrokeTransparency = 0.2
-	label.Text = Strings.Guardian.wake
-	label.Parent = gui
 	return gui
 end
 
@@ -86,7 +74,7 @@ local function tick(dt: number)
 		if event == "caught" and carrier then
 			Carry.drop(carrier, "caught")
 			Carry.knockback(carrier, Vector3.new(guardian.brain.x, 0, guardian.brain.z))
-			Remotes.get("Toast"):FireClient(carrier, Strings.Toasts.caught)
+			Notify.toast(carrier, "caught")
 		end
 		render(guardian)
 	end

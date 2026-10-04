@@ -8,12 +8,18 @@ An original Roblox steal game about enormous, round, sleepy animals called **Cho
 
 - **Playable:** a greybox *vertical slice* with one zone, one kind of guardian, ten Chonks, your Vault, the hamster wheel, carrying, the bat and the reveal card.
 - **The Showcase heist**, the first Alpha feature. Your porch has two Showcase slots, you can steal from other players' porches, and a Practice House near the middle lets you learn stealing for free ([details below](#the-showcase-heist-new)).
-- **It looks like a game now.** Two presentation passes (29 Sep and 1 Oct) gave it bright, saturated lighting, ten Chonks you can tell apart at a glance, a different colour for every house, a warm sand plaza, a field with trees and flowers, a much better HUD, and a gentle idle bob on Chonks sitting on a pad. The map is closed in by wooded hills with an invisible wall at the edge, the camera zoom stays in a sensible range, and Chonks no longer clip into each other or the walls. **It is all still placeholder**, built from Studio's own bricks and spheres ([more below](#art)).
-- **New on 4 Oct:** the unwrap card now shows the Chonk you got, turning on the card, behind a burst in its rarity colour. Name tags no longer pile up on top of each other: when two would overlap, the nearer one stays and the one behind it fades out until it has room.
+- **It looks like a game now.** Two presentation passes (29 Sep and 1 Oct) gave it bright lighting, ten Chonks you can tell apart at a glance, a different colour for every house, a field with trees, a much better HUD, and a gentle idle bob on Chonks sitting on a pad. The map is closed in by wooded hills with an invisible wall at the edge, the camera zoom stays in a sensible range, and Chonks no longer clip into each other or the walls.
+- **New on 4 Oct: sound, and a big visual clean-up.**
+  - **Sound for the first time.** There are button clicks and a chime on every pop-up, with a different one for good news, bad news and "no". You also hear a pop when you grab, a cash-register ding when you stash, a victory sting when you get home and a sly little tune when you steal. A robbed porch sets off a car alarm, and unwrapping plays a fanfare. A **sound on/off button** sits on the left of the screen.
+  - **Every house is now a little cottage** facing a town square with a fountain, its roof rising behind the yard. The hamster wheel is a real wheel with you inside it, and it spins while you run in it.
+  - **Text is fixed.** Name tags shrink with distance, sit neatly above their Chonk, never get cut off by walls, and fade out instead of popping. House names, the Practice House sign, the BACKYARDS sign and the raid-cooldown countdown are printed on real boards instead of floating in the air.
+  - **The field uses free scenery that Roblox publishes for any game to use:** low-poly trees, rocks, flowers and benches, with only the green trees kept. Lamps and pads no longer glow into white blobs.
+  - The unwrap card shows the Chonk you got, turning on the card, and the prompts (**GRAB**, **STEAL**, **PEDAL!**) have the game's own look.
+  - **Still placeholder:** the Chonks themselves are still built from Studio's own spheres and blocks ([more below](#art)).
 - **One trade-off we made:** so ten Chonks fit in a Vault, the biggest size is now only a bit bigger than the smallest. It is easy to undo if the size feels too tame.
-- **Checked:** 83 automated tests of the game rules pass. Solo playtests in Studio ran the whole loop end to end, including stealing the practice Chonk, stashing it, and unwrapping on the porch, with real key presses.
+- **Checked:** 86 automated tests of the game rules pass. Solo playtests in Studio ran the whole loop end to end, including stealing the practice Chonk, stashing it, and unwrapping on the porch, with real key presses.
 - **Not checked yet:** two players at once (so real porch theft between people), phones and touch controls, performance. Nothing is saved between sessions yet.
-- **There is no sound at all.** That is the biggest thing still missing, and we need to agree where audio comes from before it can be added ([below](#art)).
+- **Nobody has listened to the sounds properly yet.** They were picked from Roblox's library by name and length, so tell us which ones grate.
 - **Merged into `main` on 30 Sep 2026.** Everything is on one branch now.
 - **Fixed:** built places used to bury the whole map under the grass. If you built the place before 27 Sep, build it again.
 
@@ -39,6 +45,7 @@ To edit code while Studio is open, run `rojo plugin install` once, then `rojo se
 | Grab a burrito, pedal the wheel, put something in your Vault or on your porch, move a Chonk between them | **E** at the prompt | Tap the prompt |
 | Steal from a porch | Hold **E** for 1.5 s | Hold the prompt |
 | Bat someone carrying a burrito (field only) | **F** | Bat button / **X** |
+| Sound on or off | Click the speaker button on the left | Tap it |
 
 ### What happens in the slice
 
@@ -59,7 +66,7 @@ The first Alpha feature (design §10–11), built from [the heist plan](docs/sup
 1. Your porch has two **Showcase** pads. **Put here** a burrito and it unwraps there in half the Vault time. A Chonk on the porch earns +50 %, but other players can steal it.
 2. While you stand at home, **To Vault** and **To Porch** move a Chonk for free.
 3. On someone else's porch, hold **Steal** for 1.5 s and carry the item home under the normal carry rules. A stolen burrito keeps its unwrap progress. At home you can put it in your Vault or on your porch.
-4. The victim's porch lights flash red, both players get a pop-up, and that porch can't be robbed again for 2 minutes (a countdown sign shows above it).
+4. The victim's porch lights flash red, both players get a pop-up, and that porch can't be robbed again for 2 minutes (a red countdown plaque hangs under its porch beam).
 5. The **Practice House** in the middle of the district has a free Common on its porch. Steal it and carry it home to learn the heist. Each player keeps one per session.
 6. Nothing is deleted: a stolen item that gets dropped walks back to its owner after 60 seconds, and if the thief leaves the game it goes straight back.
 
@@ -82,7 +89,8 @@ A few rules the design doesn't settle are proposals for us to decide, in the pla
 3. **Feel.** Is the chase fun? A brand-new player is slower than the Mama Chonk and has to grab while she is on the far side of her loop. Even with ~160 Zoomies she caught one of our grabs. Is stealing fun, and is 1.5 s the right hold?
 4. **Numbers and names.** Every value the design left open is a proposal in the decisions tables of the [slice plan](docs/superpowers/plans/2026-09-24-vertical-slice-prototype.md#prototype-decisions-the-spec-does-not-settle-proposals-tune-or-overrule-freely) and the [heist plan](docs/superpowers/plans/2026-09-25-showcase-heist.md#prototype-decisions-the-spec-does-not-settle-proposals-tune-or-overrule-freely). The numbers live in [`Config.luau`](src/shared/Config.luau). Chonk names, bios and pop-up text are draft copy in [`Catalog.luau`](src/shared/Catalog.luau) and [`Strings.luau`](src/shared/Strings.luau). Change or overrule anything.
 5. **A phone**, if you can. The touch buttons exist but haven't been tried on a real device.
-6. **How it looks.** Can you tell the ten Chonks apart without reading the name tags? Is the base readable when you walk in with a full Vault, and can you still read the tags? Does unwrapping a Chonk feel like a moment? Anything that looks wrong, cheap or confusing — say so, it is all placeholder and cheap to change.
+6. **How it looks.** Can you tell the ten Chonks apart without reading the name tags? Is the base readable when you walk in with a full Vault? Can you still read the tags up close and from across the yard? Does unwrapping a Chonk feel like a moment? If anything looks wrong, cheap or confusing, say so: it is all placeholder and cheap to change.
+7. **How it sounds.** Play with sound on for a few minutes. Which sounds fit, which are annoying, and is anything too loud or too long? Every sound is one line in [`Sounds.luau`](src/shared/Sounds.luau), so swapping one is easy.
 
 ## What's next
 
@@ -92,9 +100,13 @@ The rest of the Alpha (design §23): porch shields and the away timer, the Grudg
 
 Proper art is still **paused** while we get the prototype right (decided 25 Sep 2026). Nothing you see is final, and no Chonk has been signed off.
 
-What changed on 29 Sep is only *how the placeholder is built*. Everything in the game is still made from Studio's own spheres, blocks and cylinders — no Blender, no Meshy, no AI-generated meshes, nothing downloaded from the Creator Store. The ten Chonks are now 13 to 32 parts each instead of five, so a frog reads as a frog and a penguin as a penguin, and the lighting and scenery were built out to match. If we replace them with real models later, nothing about the game rules has to change.
+The Chonks are still made from Studio's own spheres, blocks and cylinders: no Blender, no Meshy, no AI-generated meshes. They are 13 to 32 parts each, so a frog reads as a frog and a penguin as a penguin. If we replace them with real models later, nothing about the game rules has to change.
 
-The one thing that could not be done this way is **sound**, and the game is completely silent. Audio always means using an uploaded sound file, which is outside "build it from Studio parts", so it needs a call from us first. Roblox's own free sound library is the obvious place to start — say the word and it can go in.
+Since 4 Oct the **scenery, the buttons and the sound** may also use things Roblox itself publishes for any game, and nothing else:
+
+- **Scenery:** two low-poly packs published by Roblox (Synty Nature and Synty City), described as "officially licensed for use in any Roblox game". The game loads them by ID when the server starts, so the repo holds only their IDs. If they ever fail to load, the old hand-built trees and rocks come back automatically.
+- **Sound:** Roblox's own interface sounds plus the licensed library Roblox gives every game (APM Music and Pro Sound Effects). The full list is in [`Sounds.luau`](src/shared/Sounds.luau).
+- **Not allowed:** free models, pictures or sounds from other creators, and anything containing scripts.
 
 - The corgi model and renders in `assets/chonks/corgi/` are a **rejected** early attempt, kept for reference.
 - The corgi concept art is in `concepts/`.
@@ -115,7 +127,7 @@ The one thing that could not be done this way is **sound**, and the game is comp
 | [`docs/superpowers/plans/`](docs/superpowers/plans/) | Build plans: the vertical slice and the Showcase heist (both built). |
 | [`src/shared/`](src/shared/) | Game rules, all the numbers, the Chonk catalog and all the text. |
 | [`src/server/`](src/server/) | The server: world, nests, guardians, carrying, Vault, porch Showcase, Practice House, wheel, bat. |
-| [`src/client/`](src/client/) | The HUD, reveal card, camera, effects, input, the prompt filter, the idle bob on displayed Chonks and the name-tag thinning. |
+| [`src/client/`](src/client/) | The HUD and pop-ups, sound, buttons, the look of the prompts, the reveal card, camera, effects, input, the prompt filter, the idle bob, the spinning wheel and the name-tag thinning. |
 | [`tests/`](tests/) | Automated tests for the rules in `src/shared/`. |
 | [`codex/HANDOFF.md`](codex/HANDOFF.md) | Detailed latest status: what was verified, what's outstanding, what's next. |
 | [`codex/PROJECT_CONTEXT.md`](codex/PROJECT_CONTEXT.md) | Decisions, their history and the open design questions. |
@@ -137,8 +149,8 @@ Then open `src/shared/` and read `ShowcaseRules.luau`. It's small, it's pure, an
 ## How it's put together
 
 - **The server decides everything.** Clients send one thing (`BatSwing`) and otherwise only ask. Every prompt handler re-checks reach and ownership server-side, and the Steal hold is timed on the server, not trusted from the client.
-- **`src/shared/` is pure rules, and that's deliberate.** Those modules use string requires and touch no Roblox APIs, so [`tests/`](tests/) can run them headlessly under Lune — no Studio, no place file, 74 tests in about a second. When you add a rule, put the decision in `src/shared/` and a test beside it; keep `src/server/` for the parts that move things in the world.
-- **The map is built by code at server start**, by `World.luau` (field, kerb, nests, scenery) and `Plots.luau` (the eight houses). Nothing you build by hand in Studio is saved. The field scatter is seeded, so everyone sees the same trees.
+- **`src/shared/` is pure rules, and that's deliberate.** Those modules use string requires and touch no Roblox APIs, so [`tests/`](tests/) can run them headlessly under Lune — no Studio, no place file, 86 tests in about a second. When you add a rule, put the decision in `src/shared/` and a test beside it; keep `src/server/` for the parts that move things in the world.
+- **The map is built by code at server start**, by `World.luau` (field, kerb, nests, scenery, the plaza) and `Plots.luau` (the eight houses and their cottages). Nothing you build by hand in Studio is saved. The field scatter is seeded, so everyone sees the same trees. `Props.luau` fetches the licensed scenery packs first; if they don't arrive within 12 seconds, the map is built from parts instead.
 - **`src/server/Carry.luau` is the one registry of physical items.** Anything a player can pick up is a `Carry.Item`, and `Carry.setStatus` is the only thing that writes an item's status. Hook new behaviour there rather than tracking items separately.
 
 ### Things that will bite you
@@ -152,6 +164,9 @@ Then open `src/shared/` and read `ShowcaseRules.luau`. It's small, it's pure, an
 - **Camera zoom is deliberately bounded** (8 to 36 studs), because Roblox's defaults let you sit inside your own avatar or pull back until the map is a dot. Flip `DevHooks:Invoke("freeCamera", true)` in a playtest if you need to inspect the whole map; players never get it.
 - **The biggest Chonk has to fit between the Vault display pads.** `Config.SizeScale`'s top value, `Config.WidestBodyProfile` and `Config.Vault.displaySpacing` are tied together by a test — if you make Chonks bigger or wider, that test tells you before the models start overlapping on the pads.
 - **In a Studio playtest, `ServerStorage.DevHooks` has shortcuts** — grab, deposit, porch, steal, fill the Vault, and a time multiplier so a 20-second unwrap takes one. Listed in [HANDOFF.md](codex/HANDOFF.md). Drive a playtest through those hooks rather than requiring a server module from a scratch script: a fresh `require` gets its own copy of the module, so the running game's state looks empty.
+
+- **Text in the world comes in two kinds only** (see "World text" in [`Models.luau`](src/server/Models.luau)). Labels that follow something, like name tags and timers, use `Models.worldLabel`. They are sized partly in studs so they shrink with distance, and drawn on top so walls never cut them. Anything that names a place is printed on a real board with `Models.signFace`. Don't add floating text sized in pixels: it stays the same size at every distance and piles up.
+- **The sounds and the scenery packs are the only outside assets.** If you add one, it has to come from Roblox itself or Roblox's licensed library, and it goes in `Sounds.luau` or `Config.Props`.
 
 ### Before you push
 

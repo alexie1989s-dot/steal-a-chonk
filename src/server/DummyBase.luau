@@ -6,13 +6,13 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Catalog = require(ReplicatedStorage.Shared.Catalog)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Formulas = require(ReplicatedStorage.Shared.Formulas)
-local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local Rolls = require(ReplicatedStorage.Shared.Rolls)
 local ShowcaseRules = require(ReplicatedStorage.Shared.ShowcaseRules)
 local Strings = require(ReplicatedStorage.Shared.Strings)
 local VaultRules = require(ReplicatedStorage.Shared.VaultRules)
 local Carry = require(script.Parent.Carry)
 local Models = require(script.Parent.Models)
+local Notify = require(script.Parent.Notify)
 local PlayerState = require(script.Parent.PlayerState)
 local Showcase = require(script.Parent.Showcase)
 
@@ -27,12 +27,7 @@ local frame: CFrame
 local current: Item? -- the Chonk on the porch, if any
 local respawnAt: number? -- when the porch refills; nil while full or when a returning Chonk was reseated
 
-local function toast(player: Player, key: string)
-	local text = Strings.Toasts[key]
-	if text then
-		Remotes.get("Toast"):FireClient(player, text)
-	end
-end
+local toast = Notify.toast
 
 -- One step of the respawn loop, isolated: a single bad item must not stop the practice house for the session.
 local reported: { [string]: true } = {} -- each distinct fault is warned about once, not four times a second
@@ -88,6 +83,30 @@ local function build(parent: Instance)
 		Color = Color3.fromRGB(120, 130, 170),
 		Parent = house,
 	})
+	-- Trim in the cottages' style: corner posts and a fascia round the roof.
+	local trim = Color3.fromRGB(255, 250, 242)
+	for _, x in { -7.9, 7.9 } do
+		for _, z in { -2, 6.9 } do
+			Models.part({
+				Name = "Post",
+				Size = Vector3.new(0.9, 10, 0.9),
+				CFrame = at(Vector3.new(x, 5.5, z)),
+				Color = trim,
+				CanCollide = false,
+				CanQuery = false,
+				Parent = house,
+			})
+		end
+	end
+	Models.part({
+		Name = "Fascia",
+		Size = Vector3.new(18.6, 0.5, 11.6),
+		CFrame = at(Vector3.new(0, 10.4, 2.5)),
+		Color = trim,
+		CanCollide = false,
+		CanQuery = false,
+		Parent = house,
+	})
 	pad = Models.part({
 		Name = "DummyPad",
 		Shape = Enum.PartType.Cylinder,
@@ -98,45 +117,37 @@ local function build(parent: Instance)
 		Parent = house,
 	})
 
+	-- The sign stands on the front edge of the roof, printed on both faces, so it reads from the
+	-- plaza and from the houses behind it.
 	local sign = Models.part({
 		Name = "DummySign",
-		Size = Vector3.one,
-		CFrame = at(Vector3.new(0, 15, 0)),
-		Transparency = 1,
+		Size = Vector3.new(15, 5.4, 0.5),
+		CFrame = at(Vector3.new(0, 11.5 + 2.7, -3)),
+		Color = Color3.fromRGB(255, 214, 64),
 		CanCollide = false,
 		CanQuery = false,
 		Parent = house,
 	})
-	local gui = Instance.new("BillboardGui")
-	gui.Size = UDim2.fromOffset(320, 104)
-	gui.MaxDistance = 200
-	gui.Parent = sign
-	-- One plate holding both lines, so the sign reads as a sign rather than as text in mid air.
-	local plate = Instance.new("Frame")
-	plate.Name = "Plate"
-	plate.Size = UDim2.fromScale(1, 1)
-	plate.Parent = gui
-	Models.pill(plate, Color3.fromRGB(255, 214, 64), 14)
-	local title = Instance.new("TextLabel")
-	title.Name = "Title"
-	title.Size = UDim2.fromScale(1, 0.42)
-	title.BackgroundTransparency = 1
-	title.Font = Enum.Font.FredokaOne
-	title.TextScaled = true
-	title.TextColor3 = Color3.fromRGB(255, 214, 64)
-	title.Text = Strings.Showcase.dummyHouse
-	title.Parent = plate
-	local body = Instance.new("TextLabel")
-	body.Name = "Text"
-	body.Position = UDim2.fromScale(0, 0.42)
-	body.Size = UDim2.fromScale(1, 0.58)
-	body.BackgroundTransparency = 1
-	body.Font = Enum.Font.FredokaOne
-	body.TextScaled = true
-	body.TextWrapped = true
-	body.TextColor3 = Color3.new(1, 1, 1)
-	body.Text = Strings.Showcase.dummySign
-	body.Parent = plate
+	for _, face in { Enum.NormalId.Front, Enum.NormalId.Back } do
+		local panel = Models.signFace(sign, face)
+		Models.signText(
+			panel,
+			"Title",
+			string.upper(Strings.Showcase.dummyHouse),
+			Color3.fromRGB(255, 214, 64),
+			UDim2.fromScale(0, 0),
+			UDim2.fromScale(1, 0.44)
+		)
+		local body = Models.signText(
+			panel,
+			"Text",
+			Strings.Showcase.dummySign,
+			Color3.new(1, 1, 1),
+			UDim2.fromScale(0, 0.48),
+			UDim2.fromScale(1, 0.52)
+		)
+		body.TextWrapped = true
+	end
 
 	house.Parent = parent
 end

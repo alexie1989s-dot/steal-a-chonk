@@ -12,10 +12,12 @@ local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local ShowcaseRules = require(ReplicatedStorage.Shared.ShowcaseRules)
 local Signal = require(ReplicatedStorage.Shared.Signal)
 local Slots = require(ReplicatedStorage.Shared.Slots)
+local Sounds = require(ReplicatedStorage.Shared.Sounds)
 local Strings = require(ReplicatedStorage.Shared.Strings)
 local VaultRules = require(ReplicatedStorage.Shared.VaultRules)
 local Carry = require(script.Parent.Carry)
 local Models = require(script.Parent.Models)
+local Notify = require(script.Parent.Notify)
 local PlayerState = require(script.Parent.PlayerState)
 local Plots = require(script.Parent.Plots)
 local Vault = require(script.Parent.Vault)
@@ -45,12 +47,7 @@ local nextAlarmToken = 1
 local ALARM_RED = Color3.fromRGB(255, 40, 40)
 local ALARM_DARK = Color3.fromRGB(130, 10, 10)
 
-local function toast(player: Player, key: string)
-	local text = Strings.Toasts[key]
-	if text then
-		Remotes.get("Toast"):FireClient(player, text)
-	end
-end
+local toast = Notify.toast
 
 -- One step of a background loop, isolated: a single bad item must not stop the loop for the session.
 local reported: { [string]: true } = {} -- each distinct fault is warned about once, not four times a second
@@ -417,10 +414,6 @@ local function itemName(item: Item): string
 	return Strings.Prompts.grabObject
 end
 
-local function toastText(player: Player, text: string)
-	Remotes.get("Toast"):FireClient(player, text)
-end
-
 local function setPorchLights(plotIndex: number, color: Color3)
 	for _, part in Plots.model(plotIndex):GetChildren() do
 		if part.Name == "PorchLight" and part:IsA("BasePart") then
@@ -433,11 +426,39 @@ local function setPorchLights(plotIndex: number, color: Color3)
 	end
 end
 
--- Blinks the porch lights red for Config.Showcase.alarmSeconds (real seconds), then restores them.
+-- The car alarm on a porch: one Sound per plot, parented to a porch light so it is heard in the
+-- world, by the thief running off as much as by anyone nearby. Tagged so a client's mute covers it.
+local function alarmSound(plotIndex: number): Sound?
+	local light = Plots.model(plotIndex):FindFirstChild("PorchLight")
+	if not light then
+		return nil
+	end
+	local sound = light:FindFirstChild("Alarm") :: Sound?
+	if not sound then
+		local entry = Sounds.Catalog.alarm
+		local created = Instance.new("Sound")
+		created.Name = "Alarm"
+		created.SoundId = Sounds.uri("alarm")
+		created.Volume = entry.volume
+		created.RollOffMaxDistance = 140
+		created:SetAttribute("Sfx", true)
+		created.Parent = light
+		sound = created
+	end
+	return sound
+end
+
+-- Blinks the porch lights red and sounds the alarm for Config.Showcase.alarmSeconds (real seconds),
+-- then restores both.
 local function soundAlarm(plotIndex: number)
 	local token = nextAlarmToken
 	nextAlarmToken += 1
 	alarms[plotIndex] = token
+	local siren = alarmSound(plotIndex)
+	if siren then
+		siren.TimePosition = 0
+		siren:Play()
+	end
 	task.spawn(function()
 		local stopAt = os.clock() + Config.Showcase.alarmSeconds
 		local bright = true
@@ -448,6 +469,9 @@ local function soundAlarm(plotIndex: number)
 		end
 		if alarms[plotIndex] == token then
 			setPorchLights(plotIndex, Plots.PORCH_LIGHT)
+			if siren then
+				siren:Stop()
+			end
 		end
 	end)
 end
@@ -463,10 +487,10 @@ local function onStolen(thief: Player?, victim: Player?, item: Item)
 				soundAlarm(state.plot)
 			end
 		end
-		toastText(victim, victimText)
+		Notify.theft(victim, "stolen", victimText)
 	end
 	if thief then
-		toastText(thief, thiefText)
+		Notify.theft(thief, "youStole", thiefText)
 	end
 end
 
@@ -502,7 +526,7 @@ function Showcase.returnToOwner(item: Item): boolean
 		Vault.startIncubation(owner, slot, item)
 	end
 	item.looseAt = nil
-	toastText(owner, string.format(Strings.Theft.cameBack, itemName(item)))
+	Notify.theft(owner, "cameBack", string.format(Strings.Theft.cameBack, itemName(item)))
 	return true
 end
 
@@ -522,7 +546,7 @@ local function ownerLeaves(player: Player)
 			if item.status == "carried" and carrier and carrier ~= player then
 				Carry.take(carrier)
 				local name = itemName(item)
-				toastText(carrier, string.format(Strings.Theft.wentHome, name, name))
+				Notify.theft(carrier, "wentHome", string.format(Strings.Theft.wentHome, name, name))
 			end
 			Carry.forget(item)
 		end
@@ -530,6 +554,10 @@ local function ownerLeaves(player: Player)
 	if state and state.plot then
 		alarms[state.plot] = nil
 		setPorchLights(state.plot, Plots.PORCH_LIGHT)
+		local siren = alarmSound(state.plot)
+		if siren then
+			siren:Stop()
+		end
 	end
 end
 
@@ -559,14 +587,10 @@ local function updateCooldownSign(plotIndex: number, now: number)
 	local owner = Plots.ownerOf(plotIndex)
 	local state = owner and PlayerState.get(owner)
 	local left = if state then state.immuneUntil - now else 0
-	local gui = Plots.part(plotIndex, "CooldownSign"):FindFirstChildOfClass("BillboardGui")
-	local text = gui and gui:FindFirstChild("Text") :: TextLabel?
-	if gui and text then
-		gui.Enabled = left > 0
-		if left > 0 then
-			text.Text = string.format(Strings.Showcase.raidCooldown, Format.clock(left))
-		end
-	end
+	Plots.setCooldown(
+		plotIndex,
+		if left > 0 then string.format(Strings.Showcase.raidCooldown, Format.clock(left)) else nil
+	)
 end
 
 -- One porch burrito's countdown label, or its reveal once the unwrap is done.

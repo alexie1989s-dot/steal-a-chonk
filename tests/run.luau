@@ -82,6 +82,12 @@ local suites: { { name: string, load: () -> () } } = {
 			require("./Declutter.spec")
 		end,
 	},
+	{
+		name = "Sounds",
+		load = function()
+			require("./Sounds.spec")
+		end,
+	},
 }
 
 local loadFailures = {}

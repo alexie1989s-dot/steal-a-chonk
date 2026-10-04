@@ -15,6 +15,7 @@ local Strings = require(ReplicatedStorage.Shared.Strings)
 local VaultRules = require(ReplicatedStorage.Shared.VaultRules)
 local Carry = require(script.Parent.Carry)
 local Models = require(script.Parent.Models)
+local Notify = require(script.Parent.Notify)
 local PlayerState = require(script.Parent.PlayerState)
 local Plots = require(script.Parent.Plots)
 
@@ -32,12 +33,7 @@ local Vault = {
 -- Display models by player, keyed by pad.
 local displays: { [Player]: { [number]: Model } } = {}
 
-local function toast(player: Player, key: string)
-	local text = Strings.Toasts[key]
-	if text then
-		Remotes.get("Toast"):FireClient(player, text)
-	end
-end
+local toast = Notify.toast
 
 local function placeDisplay(player: Player, record: PlayerState.ChonkRecord, pad: number)
 	local state = PlayerState.get(player)

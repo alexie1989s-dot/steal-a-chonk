@@ -4,12 +4,16 @@
 --
 -- Everything built here is scenery. Only the curb and the nests carry meaning, so all of the
 -- dressing is CanCollide false: it must never block a chase or a juke (spec §11).
+--
+-- Trees, rocks, bushes, flowers, clouds and the district benches use the licensed Synty meshes
+-- when Props loaded them, and fall back to the part-built versions below when it did not.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Layout = require(ReplicatedStorage.Shared.Layout)
 local Strings = require(ReplicatedStorage.Shared.Strings)
 local Models = require(script.Parent.Models)
+local Props = require(script.Parent.Props)
 
 local World = {}
 
@@ -40,6 +44,64 @@ local PETALS = {
 	Color3.fromRGB(170, 170, 255),
 	Color3.fromRGB(255, 250, 240),
 }
+
+-- Synty Nature and City pack meshes, by the name Props indexes them under. Green ones only: half
+-- the pack is in autumn colours, and yellow and orange trees scattered through a spring field read
+-- as a mess. Picked by lining every tree up in the field and looking.
+local TREES = {
+	"PolygonNature_Tree_Round_02",
+	"PolygonNature_Tree_Round_03",
+	"PolygonNature_Tree_Round_04",
+	"PolygonNature_Tree_03",
+	"PolygonCity_Env_SM_Env_Tree_03",
+}
+-- The boundary woods mix pines in, so the rim reads as forest rather than as a park.
+local WOODS = table.clone(TREES)
+for _, pine in
+	{
+		"PolygonNature_Tree_PolyPine_02",
+		"PolygonNature_Tree_PolyPine_03",
+		"PolygonNature_Tree_PolyPine_Sparse_02",
+		"PolygonNature_Tree_PolyPine_Sparse_03",
+	}
+do
+	table.insert(WOODS, pine)
+end
+local ROCKS = {
+	"PolygonNature_Rock_Boulder_01",
+	"PolygonNature_Rock_Rounded_01",
+	"PolygonNature_Rock_Small_01",
+	"PolygonNature_Rock_Pile_04",
+}
+local BUSHES = {
+	"PolygonNature_Plant_Bush_01",
+	"PolygonNature_Plant_Bush_02",
+	"PolygonNature_Plant_Bush_03",
+	"PolygonNature_Plant_Hedge_Bush_01",
+	"PolygonNature_Plant_Hedge_Bush_02",
+}
+local FLOWERS = {
+	"PolygonNature_Plant_Flowers_01",
+	"PolygonNature_Plant_04",
+	"PolygonNature_Plant_02",
+	"PolygonNature_Plant_03",
+	"PolygonNature_Plant_Fern_03",
+	"PolygonNature_Plant_Mushrooms_01",
+	"PolygonNature_Plant_Mushrooms_03",
+}
+local CLOUDS = { "PolygonNature_Prop_Cloud_01", "PolygonNature_Prop_Cloud_02", "PolygonNature_Prop_Cloud_03" }
+local BENCH = "PolygonCity_Props_SM_Prop_ParkBench_01"
+local BIN = "PolygonCity_Props_SM_Prop_Trashbin_01"
+local PLANTER = "PolygonCity_Props_SM_Prop_Planter_02"
+
+local function pick(list: { string }, rng: Random): string
+	return list[rng:NextInteger(1, #list)]
+end
+
+-- A mesh standing on the ground at (x, z), turned to a random yaw.
+local function grounded(x: number, z: number, rng: Random, sink: number?): CFrame
+	return CFrame.new(x, -(sink or 0), z) * CFrame.Angles(0, rng:NextNumber() * 2 * math.pi, 0)
+end
 
 -- Scenery helper: never collides, never eats a ProximityPrompt raycast.
 local function prop(props: { [string]: any }): BasePart
@@ -94,31 +156,42 @@ local function signpost(text: string, position: Vector3, parent: Instance)
 		Material = Enum.Material.SmoothPlastic,
 		Parent = model,
 	})
-	local gui = Instance.new("BillboardGui")
-	-- Sized in studs, not pixels: an offset-sized billboard keeps its screen size at any range, so
-	-- the zone name used to balloon over the whole district when seen from the field.
-	gui.Size = UDim2.fromScale(40, 9)
-	gui.StudsOffset = Vector3.new(0, 0, 1)
-	gui.AlwaysOnTop = false
-	gui.MaxDistance = 600
-	gui.Parent = board
-	local label = Instance.new("TextLabel")
-	label.Size = UDim2.fromScale(1, 1)
-	label.BackgroundTransparency = 1
-	label.Font = Enum.Font.FredokaOne
-	label.TextScaled = true
-	label.TextColor3 = Color3.fromRGB(255, 244, 214)
-	label.Text = text
-	label.Parent = gui
-	local stroke = Instance.new("UIStroke")
-	stroke.Color = Color3.fromRGB(40, 28, 20)
-	stroke.Thickness = 3
-	stroke.Parent = label
+	-- Printed on both faces of the board. It used to be a billboard hung in front of it, which turned
+	-- to face the camera while the board did not, so from an angle the board cut the letters in half.
+	for _, face in { Enum.NormalId.Front, Enum.NormalId.Back } do
+		local panel = Models.signFace(board, face)
+		panel.BackgroundColor3 = Color3.fromRGB(70, 52, 40)
+		local line = Models.signText(
+			panel,
+			"Zone",
+			string.upper(text),
+			Color3.fromRGB(255, 244, 214),
+			UDim2.fromScale(0, 0),
+			UDim2.fromScale(1, 1)
+		)
+		line.Font = Enum.Font.LuckiestGuy
+	end
 	model.Parent = parent
 end
 
 -- A rounded shrub: a squat core with a few blobs on top to break the silhouette, plus flowers.
 local function bush(position: Vector3, yaw: number, scale: number, rng: Random, parent: Instance)
+	if Props.has(BUSHES[1]) then
+		-- Three shrubs along the hedge's length, overlapping into one row.
+		local model = Instance.new("Model")
+		model.Name = "Hedge"
+		local base = CFrame.new(position.X, -0.2, position.Z) * CFrame.Angles(0, yaw, 0)
+		for i = -1, 1 do
+			Props.place(
+				pick(BUSHES, rng),
+				base * CFrame.new(i * 4.2 * scale, 0, 0) * CFrame.Angles(0, rng:NextNumber() * 2 * math.pi, 0),
+				model,
+				{ height = (4.6 + rng:NextNumber() * 1.2) * scale }
+			)
+		end
+		model.Parent = parent
+		return
+	end
 	local model = Instance.new("Model")
 	model.Name = "Hedge"
 	local base = CFrame.new(position) * CFrame.Angles(0, yaw, 0)
@@ -156,7 +229,11 @@ local function bush(position: Vector3, yaw: number, scale: number, rng: Random, 
 	model.Parent = parent
 end
 
-local function tree(position: Vector3, scale: number, rng: Random, parent: Instance)
+local function tree(position: Vector3, scale: number, rng: Random, parent: Instance, kinds: { string }?)
+	local at = grounded(position.X, position.Z, rng, 0.4 - position.Y)
+	if Props.place(pick(kinds or TREES, rng), at, parent, { height = (24 + rng:NextNumber() * 8) * scale }) then
+		return
+	end
 	local model = Instance.new("Model")
 	model.Name = "Tree"
 	local height = (16 + rng:NextNumber() * 8) * scale
@@ -186,6 +263,10 @@ local function tree(position: Vector3, scale: number, rng: Random, parent: Insta
 end
 
 local function rock(position: Vector3, scale: number, rng: Random, parent: Instance)
+	local at = grounded(position.X, position.Z, rng, 0.3)
+	if Props.place(pick(ROCKS, rng), at, parent, { height = (3.5 + rng:NextNumber() * 2.5) * scale }) then
+		return
+	end
 	local model = Instance.new("Model")
 	model.Name = "Rock"
 	for i = 1, rng:NextInteger(2, 3) do
@@ -207,6 +288,15 @@ end
 local function flowerPatch(position: Vector3, rng: Random, parent: Instance)
 	local model = Instance.new("Model")
 	model.Name = "Flowers"
+	if Props.has(FLOWERS[1]) then
+		for _ = 1, rng:NextInteger(4, 7) do
+			local x = position.X + (rng:NextNumber() - 0.5) * 9
+			local z = position.Z + (rng:NextNumber() - 0.5) * 9
+			Props.place(pick(FLOWERS, rng), grounded(x, z, rng), model, { height = 1.6 + rng:NextNumber() * 1.4 })
+		end
+		model.Parent = parent
+		return
+	end
 	for _ = 1, rng:NextInteger(4, 7) do
 		local at = position + Vector3.new((rng:NextNumber() - 0.5) * 9, 0, (rng:NextNumber() - 0.5) * 9)
 		local height = 1.4 + rng:NextNumber() * 1.2
@@ -272,6 +362,41 @@ local function nestBowl(index: number, x: number, z: number, parent: Instance): 
 	end
 	nest.Parent = parent
 	return nest
+end
+
+-- The plaza fountain: a stone basin of water with a column and a bowl, all scenery (players walk
+-- through it, as they do every other decoration). It stands on the join spawn, which nobody sees:
+-- a joining player is moved to their porch as soon as their character exists.
+local function fountain(parent: Instance)
+	local model = Instance.new("Model")
+	model.Name = "Fountain"
+	local stone = Color3.fromRGB(214, 206, 196)
+	local water = Color3.fromRGB(110, 196, 236)
+	local function ring(
+		name: string,
+		radius: number,
+		height: number,
+		y: number,
+		color: Color3,
+		material: Enum.Material?
+	)
+		return prop({
+			Name = name,
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(height, radius * 2, radius * 2),
+			CFrame = CFrame.new(0, y, 0) * CFrame.Angles(0, 0, math.pi / 2),
+			Color = color,
+			Material = material or Enum.Material.SmoothPlastic,
+			Parent = model,
+		})
+	end
+	ring("Basin", 7.2, 1.8, 1.2, stone)
+	ring("Water", 6.4, 0.3, 2.0, water, Enum.Material.Glass).Transparency = 0.2
+	ring("Column", 1.1, 4.6, 3.5, stone)
+	ring("Bowl", 2.8, 0.7, 5.8, stone)
+	ring("BowlWater", 2.4, 0.3, 6.1, water, Enum.Material.Glass).Transparency = 0.2
+	ring("Top", 0.7, 1.4, 6.9, stone)
+	model.Parent = parent
 end
 
 export type WorldInfo = { nests: { Vector3 }, curbRadius: number }
@@ -351,7 +476,8 @@ local function boundary(root: Instance, rng: Random)
 				Vector3.new(tx, surfaceAt(Layout.planarDistance(tx, tz, hx, hz)) - 1.5, tz),
 				1 + rng:NextNumber() * 0.6,
 				rng,
-				fence
+				fence,
+				WOODS
 			)
 		end
 	end
@@ -382,6 +508,48 @@ local function boundary(root: Instance, rng: Random)
 	end
 end
 
+-- A loose ring of clouds above the far ridge, so the sky is not one flat colour. Mesh only: with
+-- no pack there is no part version, the sky just stays clear.
+local function clouds(root: Instance, rng: Random)
+	if not Props.has(CLOUDS[1]) then
+		return
+	end
+	local folder = Instance.new("Folder")
+	folder.Name = "Clouds"
+	folder.Parent = root
+	local count = 18
+	for i = 1, count do
+		local angle = 2 * math.pi * (i - 0.5) / count + (rng:NextNumber() - 0.5) * 0.25
+		local r = 380 + rng:NextNumber() * 260
+		local at = CFrame.new(r * math.cos(angle), 180 + rng:NextNumber() * 70, r * math.sin(angle))
+			* CFrame.Angles(0, rng:NextNumber() * 2 * math.pi, 0)
+		Props.place(pick(CLOUDS, rng), at, folder, { scale = 3.5 + rng:NextNumber() * 2.5, castShadow = false })
+	end
+end
+
+-- A bench, a bin and a planter in each gap between two houses, under the gap's lamp post, so the
+-- district reads as a street people live on. Mesh only, like the clouds.
+local function streetFurniture(root: Instance)
+	if not Props.has(BENCH) then
+		return
+	end
+	local folder = Instance.new("Folder")
+	folder.Name = "StreetFurniture"
+	folder.Parent = root
+	local base = Config.Base
+	for i = 1, base.plotCount do
+		local angle = 2 * math.pi * (i - 0.5) / base.plotCount
+		local outward = Vector3.new(math.cos(angle), 0, math.sin(angle))
+		local at = outward * (base.curbRadius - 12)
+		-- The bench looks in towards the middle of the district. The Synty bench's seat faces its
+		-- local +Z, so its -Z (lookAt's forward) has to point outward.
+		local facing = CFrame.lookAt(at, at + outward)
+		Props.place(BENCH, facing, folder, { scale = 1.25 })
+		Props.place(BIN, facing * CFrame.new(5.8, 0, 0), folder, { scale = 1.2 })
+		Props.place(PLANTER, facing * CFrame.new(-6.4, 0, 0.4), folder, { scale = 1.3 })
+	end
+end
+
 function World.build(): WorldInfo
 	local existing = workspace:FindFirstChild("World")
 	if existing then
@@ -398,8 +566,10 @@ function World.build(): WorldInfo
 	flatDisc("BaseDistrict", base.curbRadius, 0.4, 0.2, PAVE, root)
 	flatDisc("BaseRingOuter", base.curbRadius - 16, 0.42, 0.24, PAVE_RING, root)
 	flatDisc("BaseRingInner", base.plotRingRadius - 24, 0.44, 0.28, PAVE_ALT, root)
-	flatDisc("Medallion", 16, 0.5, 0.32, CURB_YELLOW, root)
-	flatDisc("MedallionEye", 9, 0.52, 0.36, PAVE, root)
+	-- A stone ring and a fountain at the centre, where a yellow target used to be.
+	flatDisc("Medallion", 16, 0.5, 0.32, Color3.fromRGB(232, 214, 178), root)
+	flatDisc("MedallionEye", 10, 0.52, 0.36, PAVE_ALT, root)
+	fountain(root)
 
 	-- The painted curb: alternating blocks with a glowing inner line and corner posts.
 	local curb = Instance.new("Folder")
@@ -454,19 +624,31 @@ function World.build(): WorldInfo
 			Material = Enum.Material.Metal,
 			Parent = curb,
 		})
+		-- A lantern under a shade, lit but not glowing: a Neon globe crossed the bloom threshold and
+		-- blew out into a white smear at every distance.
 		local lamp = prop({
 			Name = "Lamp",
 			Shape = Enum.PartType.Ball,
-			Size = Vector3.one * 3,
-			CFrame = CFrame.new(at + Vector3.new(0, 16.5, 0)),
-			Color = Color3.fromRGB(255, 236, 180),
-			Material = Enum.Material.Neon,
+			Size = Vector3.one * 2.4,
+			CFrame = CFrame.new(at + Vector3.new(0, 16.6, 0)),
+			Color = Color3.fromRGB(255, 240, 200),
+			Material = Enum.Material.SmoothPlastic,
+			CastShadow = false,
+			Parent = curb,
+		})
+		prop({
+			Name = "LampShade",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(0.5, 3.4, 3.4),
+			CFrame = CFrame.new(at + Vector3.new(0, 17.9, 0)) * CFrame.Angles(0, 0, math.pi / 2),
+			Color = CURB_DARK,
+			Material = Enum.Material.SmoothPlastic,
 			Parent = curb,
 		})
 		local glow = Instance.new("PointLight")
 		glow.Color = Color3.fromRGB(255, 226, 160)
-		glow.Range = 26
-		glow.Brightness = 1.2
+		glow.Range = 22
+		glow.Brightness = 0.9
 		glow.Parent = lamp
 	end
 
@@ -520,21 +702,12 @@ function World.build(): WorldInfo
 			else
 				bush(at + Vector3.new(0, 2, 0), rng:NextNumber() * 6, 0.55, rng, dressing)
 			end
-			-- A darker grass patch under the prop, to break up the flat ground.
-			prop({
-				Name = "Patch",
-				CastShadow = false,
-				Shape = Enum.PartType.Cylinder,
-				Size = Vector3.new(0.2, 16 + rng:NextNumber() * 14, 16 + rng:NextNumber() * 14),
-				CFrame = CFrame.new(at + Vector3.new(0, 0.06, 0)) * CFrame.Angles(0, 0, math.pi / 2),
-				Color = Models.shade(GRASS_DARK, (rng:NextNumber() - 0.4) * 0.2),
-				Material = Enum.Material.Grass,
-				Parent = dressing,
-			})
 		end
 	end
 
 	boundary(root, rng)
+	clouds(root, rng)
+	streetFurniture(root)
 
 	-- Raised clear of the tree line: this is the one landmark that tells a new player where the
 	-- district is from anywhere in the field.

@@ -4,6 +4,7 @@ local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local Version = require(ReplicatedStorage.Shared.Version)
 local Server = script.Parent
 
+local Props = require(Server.Props)
 local World = require(Server.World)
 local DevHooks = require(Server.DevHooks)
 local DevActions = require(Server.DevActions)
@@ -20,6 +21,8 @@ local DummyBase = require(Server.DummyBase)
 local Bat = require(Server.Bat)
 
 Remotes.createAll()
+-- The licensed scenery packs first: World uses them where they arrived (Props).
+Props.load()
 local world = World.build()
 
 -- Services connect to PlayerState signals first; PlayerState.start() then announces players.

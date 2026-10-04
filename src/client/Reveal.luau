@@ -14,6 +14,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local Strings = require(ReplicatedStorage.Shared.Strings)
+local Sfx = require(script.Parent.Sfx)
 
 local Reveal = {}
 
@@ -23,6 +24,8 @@ local INK = Color3.fromRGB(18, 15, 28)
 local GOLD = Color3.fromRGB(255, 214, 64)
 local STAMP_RED = Color3.fromRGB(235, 60, 60)
 local RAYS = 12
+-- From this tier up, or at the top size, the card gets the bigger fanfare.
+local BIG_TIER = table.find(Config.Tiers, "Epic") :: number
 
 local function corner(parent: Instance, radius: UDim)
 	local c = Instance.new("UICorner")
@@ -107,7 +110,9 @@ function Reveal.start()
 	burst.Name = "Burst"
 	burst.AnchorPoint = Vector2.new(0.5, 0.5)
 	burst.Position = UDim2.fromScale(0.5, 0.5)
-	burst.Size = UDim2.fromScale(2, 2)
+	-- Kept close round the card and faint: full-screen rays at half opacity swamped everything, and
+	-- for a Common (grey) they were just a white mess.
+	burst.Size = UDim2.fromScale(1.25, 1.25)
 	burst.BackgroundTransparency = 1
 	burst.Parent = backdrop
 	local burstAspect = Instance.new("UIAspectRatioConstraint")
@@ -134,9 +139,9 @@ function Reveal.start()
 		fade.Rotation = 90
 		fade.Transparency = NumberSequence.new({
 			NumberSequenceKeypoint.new(0, 1),
-			NumberSequenceKeypoint.new(0.12, 0.72),
-			NumberSequenceKeypoint.new(0.5, 0.55),
-			NumberSequenceKeypoint.new(0.88, 0.72),
+			NumberSequenceKeypoint.new(0.2, 0.9),
+			NumberSequenceKeypoint.new(0.5, 0.8),
+			NumberSequenceKeypoint.new(0.8, 0.9),
 			NumberSequenceKeypoint.new(1, 1),
 		})
 		fade.Parent = ray
@@ -214,12 +219,14 @@ function Reveal.start()
 	lens.Parent = view
 	view.CurrentCamera = lens
 
+	-- Stamped across the portrait's lower corner, like a rubber stamp on a photo, so it no longer
+	-- sits in the line between the picture and the name.
 	local stamp = text(card, "SizeStamp", {
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		Size = UDim2.fromScale(0.84, 0.085),
-		Position = UDim2.fromScale(0.5, 0.48),
+		Size = UDim2.fromScale(0.56, 0.07),
+		Position = UDim2.fromScale(0.7, 0.44),
 		TextColor3 = GOLD,
-		Rotation = -6,
+		Rotation = -10,
 		ZIndex = 3,
 	})
 	local stampEdge = Instance.new("UIStroke")
@@ -337,9 +344,14 @@ function Reveal.start()
 		-- The top size prints in red on a shaking card (spec §8).
 		local top = payload.size >= 6
 		stamp.TextColor3 = if top then STAMP_RED else GOLD
+		-- A top-size card wobbles the stamp; put it back to rest for the next one.
+		stamp.Rotation = -10
 		card.Rotation = 0
 
 		gui.Enabled = true
+		local big = top or (table.find(Config.Tiers, payload.tier) or 1) >= BIG_TIER
+		Sfx.play("whoosh")
+		Sfx.play(if big then "revealBig" else "reveal")
 		backdrop.BackgroundTransparency = 1
 		TweenService:Create(backdrop, TweenInfo.new(0.2), { BackgroundTransparency = 0.35 }):Play()
 		scale.Scale = 0.6
@@ -354,6 +366,7 @@ function Reveal.start()
 			end
 			stamp.TextTransparency = 0
 			stampEdge.Transparency = 0
+			Sfx.play("stamp")
 			TweenService:Create(stampScale, TweenInfo.new(0.22, Enum.EasingStyle.Back), { Scale = 1 }):Play()
 		end)
 
@@ -373,13 +386,14 @@ function Reveal.start()
 			end
 			dismiss.TextTransparency = 0.25 + math.sin(t * 3) * 0.25
 			if top then
-				stamp.Rotation = -6 + math.sin(t * 40) * 4
+				stamp.Rotation = -10 + math.sin(t * 40) * 4
 				card.Rotation = math.sin(t * 31) * 1.2
 			end
 		end)
 	end
 
 	backdrop.Activated:Connect(function()
+		Sfx.play("click")
 		card.Rotation = 0
 		showNext()
 	end)

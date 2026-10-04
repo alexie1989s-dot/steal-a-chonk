@@ -4,7 +4,7 @@ An original Roblox steal game about enormous, round, sleepy animals called **Cho
 
 > **Everything lives on `main`.** The playable prototype was merged there on 30 Sep 2026, so the game code, the design and the art history are all in one place. `prototype/vertical-slice` is the branch it was built on and now points at the same commit, so whichever of the two you have checked out, you are not missing anything.
 
-## Where we are (updated 4 Oct 2026)
+## Where we are (updated 5 Oct 2026)
 
 - **Playable:** a greybox *vertical slice* with one zone, one kind of guardian, ten Chonks, your Vault, the hamster wheel, carrying, the bat and the reveal card.
 - **The Showcase heist**, the first Alpha feature. Your porch has two Showcase slots, you can steal from other players' porches, and a Practice House near the middle lets you learn stealing for free ([details below](#the-showcase-heist-new)).
@@ -16,8 +16,13 @@ An original Roblox steal game about enormous, round, sleepy animals called **Cho
   - **The field uses free scenery that Roblox publishes for any game to use:** low-poly trees, rocks, flowers and benches, with only the green trees kept. Lamps and pads no longer glow into white blobs.
   - The unwrap card shows the Chonk you got, turning on the card, and the prompts (**GRAB**, **STEAL**, **PEDAL!**) have the game's own look.
   - **Still placeholder:** the Chonks themselves are still built from Studio's own spheres and blocks ([more below](#art)).
+- **New on 5 Oct: glossy buttons and a much bigger map.**
+  - **Buttons and panels now have a glossy, glassy look.** The HUD, the pop-ups, the prompts and the reveal card are all glass, and buttons sink when you press them. On phones the Bat button sits beside Roblox's jump button instead of on top of it.
+  - **The map is about twice as big, with an uneven edge** instead of a perfect circle. The ground you play on is still completely flat, so nothing floats. Past the edge, real Terrain hills and a taller ridge close the view, and a small pond sits beyond a fence where nobody can reach it. The grass, the dirt under each nest and the paving are part of the land now.
+  - **There are 12 nests, spread further out (150 to 330 studs from the middle).** The far ones are a long carry home: a brand-new player needs a little time on the hamster wheel before they can outrun the Mama Chonk from there.
+  - **Still to come in this pass:** new lighting and sky, and softer far hills (right now the far ridge looks like a grey rock wall).
 - **One trade-off we made:** so ten Chonks fit in a Vault, the biggest size is now only a bit bigger than the smallest. It is easy to undo if the size feels too tame.
-- **Checked:** 86 automated tests of the game rules pass. Solo playtests in Studio ran the whole loop end to end, including stealing the practice Chonk, stashing it, and unwrapping on the porch, with real key presses.
+- **Checked:** 104 automated tests of the game rules and the map's shape pass, and Studio checks confirm the ground is flat, nothing floats and the edge stops you everywhere. Solo playtests in Studio ran the whole loop end to end, including stealing the practice Chonk, stashing it, and unwrapping on the porch, with real key presses.
 - **Not checked yet:** two players at once (so real porch theft between people), phones and touch controls, performance. Nothing is saved between sessions yet.
 - **Nobody has listened to the sounds properly yet.** They were picked from Roblox's library by name and length, so tell us which ones grate.
 - **Merged into `main` on 30 Sep 2026.** Everything is on one branch now.
@@ -51,7 +56,7 @@ To edit code while Studio is open, run `rojo plugin install` once, then `rojo se
 
 1. You spawn on your own porch. Eight houses sit in a ring inside a painted curb.
 2. Stand on the hamster wheel for Zoomies (+1 a second), or hit **Pedal** for +2. More Zoomies means faster running.
-3. Walk out into the Backyards and **Grab** a blanket burrito from one of ten nests. The glow hints at the rarity and the burrito's size hints at the Chonk's size.
+3. Walk out into the Backyards and **Grab** a blanket burrito from one of twelve nests. The glow hints at the rarity and the burrito's size hints at the Chonk's size.
 4. A Patroller Mama Chonk yells MRRP and rolls after you. Carrying slows you down.
 5. If she catches you, the burrito drops and anyone can pick it up, you included.
 6. She stops at the curb. Cross it with the burrito for confetti.
@@ -89,8 +94,9 @@ A few rules the design doesn't settle are proposals for us to decide, in the pla
 3. **Feel.** Is the chase fun? A brand-new player is slower than the Mama Chonk and has to grab while she is on the far side of her loop. Even with ~160 Zoomies she caught one of our grabs. Is stealing fun, and is 1.5 s the right hold?
 4. **Numbers and names.** Every value the design left open is a proposal in the decisions tables of the [slice plan](docs/superpowers/plans/2026-09-24-vertical-slice-prototype.md#prototype-decisions-the-spec-does-not-settle-proposals-tune-or-overrule-freely) and the [heist plan](docs/superpowers/plans/2026-09-25-showcase-heist.md#prototype-decisions-the-spec-does-not-settle-proposals-tune-or-overrule-freely). The numbers live in [`Config.luau`](src/shared/Config.luau). Chonk names, bios and pop-up text are draft copy in [`Catalog.luau`](src/shared/Catalog.luau) and [`Strings.luau`](src/shared/Strings.luau). Change or overrule anything.
 5. **A phone**, if you can. The touch buttons exist but haven't been tried on a real device.
-6. **How it looks.** Can you tell the ten Chonks apart without reading the name tags? Is the base readable when you walk in with a full Vault? Can you still read the tags up close and from across the yard? Does unwrapping a Chonk feel like a moment? If anything looks wrong, cheap or confusing, say so: it is all placeholder and cheap to change.
-7. **How it sounds.** Play with sound on for a few minutes. Which sounds fit, which are annoying, and is anything too loud or too long? Every sound is one line in [`Sounds.luau`](src/shared/Sounds.luau), so swapping one is easy.
+6. **The bigger map.** Is it fun to run around or just far? Run to the edge in a few directions: you should stop at the foot of the hills. Can a new player bring a burrito home from the far nests after a minute on the wheel?
+7. **How it looks.** Can you tell the ten Chonks apart without reading the name tags? Is the base readable when you walk in with a full Vault? Can you still read the tags up close and from across the yard? Does unwrapping a Chonk feel like a moment? If anything looks wrong, cheap or confusing, say so: it is all placeholder and cheap to change.
+8. **How it sounds.** Play with sound on for a few minutes. Which sounds fit, which are annoying, and is anything too loud or too long? Every sound is one line in [`Sounds.luau`](src/shared/Sounds.luau), so swapping one is easy.
 
 ## What's next
 
@@ -124,7 +130,7 @@ Since 4 Oct the **scenery, the buttons and the sound** may also use things Roblo
 | Path | What it is |
 | --- | --- |
 | [Design spec](docs/superpowers/specs/2026-09-06-steal-a-chonk-design.md) | The full game design, 26 sections. Still marked draft. |
-| [`docs/superpowers/plans/`](docs/superpowers/plans/) | Build plans: the vertical slice and the Showcase heist (both built). |
+| [`docs/superpowers/plans/`](docs/superpowers/plans/) | Build plans: the vertical slice, the Showcase heist and the glossy UI (built), and the bigger map (built up to its lighting step). |
 | [`src/shared/`](src/shared/) | Game rules, all the numbers, the Chonk catalog and all the text. |
 | [`src/server/`](src/server/) | The server: world, nests, guardians, carrying, Vault, porch Showcase, Practice House, wheel, bat. |
 | [`src/client/`](src/client/) | The HUD and pop-ups, sound, buttons, the look of the prompts, the reveal card, camera, effects, input, the prompt filter, the idle bob, the spinning wheel and the name-tag thinning. |
@@ -149,8 +155,8 @@ Then open `src/shared/` and read `ShowcaseRules.luau`. It's small, it's pure, an
 ## How it's put together
 
 - **The server decides everything.** Clients send one thing (`BatSwing`) and otherwise only ask. Every prompt handler re-checks reach and ownership server-side, and the Steal hold is timed on the server, not trusted from the client.
-- **`src/shared/` is pure rules, and that's deliberate.** Those modules use string requires and touch no Roblox APIs, so [`tests/`](tests/) can run them headlessly under Lune — no Studio, no place file, 86 tests in about a second. When you add a rule, put the decision in `src/shared/` and a test beside it; keep `src/server/` for the parts that move things in the world.
-- **The map is built by code at server start**, by `World.luau` (field, kerb, nests, scenery, the plaza) and `Plots.luau` (the eight houses and their cottages). Nothing you build by hand in Studio is saved. The field scatter is seeded, so everyone sees the same trees. `Props.luau` fetches the licensed scenery packs first; if they don't arrive within 12 seconds, the map is built from parts instead.
+- **`src/shared/` is pure rules, and that's deliberate.** Those modules use string requires and touch no Roblox APIs, so [`tests/`](tests/) can run them headlessly under Lune — no Studio, no place file, 104 tests in a few seconds. When you add a rule, put the decision in `src/shared/` and a test beside it; keep `src/server/` for the parts that move things in the world.
+- **The map is built by code at server start**, by `Landscape.luau` (the land itself, written as Terrain from the height map in `Ground.luau`), `World.luau` (field, kerb, nests, scenery, the plaza) and `Plots.luau` (the eight houses and their cottages). Nothing you build by hand in Studio is saved. The field scatter is seeded, so everyone sees the same trees. `Props.luau` fetches the licensed scenery packs first; if they don't arrive within 12 seconds, the map is built from parts instead.
 - **`src/server/Carry.luau` is the one registry of physical items.** Anything a player can pick up is a `Carry.Item`, and `Carry.setStatus` is the only thing that writes an item's status. Hook new behaviour there rather than tracking items separately.
 
 ### Things that will bite you
@@ -159,7 +165,8 @@ Then open `src/shared/` and read `ShowcaseRules.luau`. It's small, it's pure, an
 - **Rojo silently drops the `Position` property** in `default.project.json`. Use an explicit `CFrame` block instead, or your part lands at the origin. This buried the entire map once.
 - **Rojo does not live-apply `default.project.json` property changes** to an already-open place. Rebuild the place, or patch the open copy to match.
 - **Chonk models have a geometry contract**, written at the top of [`src/server/Models.luau`](src/server/Models.luau). The body's height is exactly `d = 4 * sizeScale(size)` and the model pivot is the body's centre, because Vault, Showcase and the Practice House all rest a Chonk with `pad.Y + d / 2` and hang its name tag at `d / 2 + 1.5`. Change the body's proportions all you like; keep that.
-- **Scenery must not collide.** Everything decorative is `CanCollide` and `CanQuery` false, so it can't block a chase or swallow a prompt's raycast. If you add props, do the same. Chonks themselves don't collide either, on purpose: you can walk through one sitting on a pad, so a display can never pin you against your own porch. The one exception is the field boundary, which is a single invisible wall ringing the map — the hills and trees around the edge are scenery and don't collide, so nobody can get stuck in them.
+- **The ground you play on is flat on purpose** (decided 4 Oct 2026). Everything inside the boundary wall is at height 0, so nothing ever floats; the land only rises past the wall. If you edit the land, know that Roblox draws a Terrain surface 2 studs above what is filled, and `LandGrid.luau` makes up for it; water has no such offset.
+- **Scenery must not collide.** Everything decorative is `CanCollide` and `CanQuery` false, so it can't block a chase or swallow a prompt's raycast. If you add props, do the same. Chonks themselves don't collide either, on purpose: you can walk through one sitting on a pad, so a display can never pin you against your own porch. The one exception is the field boundary, which is a single invisible wall ringing the map — the hills past it are Terrain and the trees on them are scenery, so nobody can get stuck in them.
 - **Studio is not a renderer test.** It throttles when it is not the foreground window and shares the GPU with the editor, so frame rates and anything that reacts to them (Roblox's Automatic quality level steps render distance and shadows up and down) behave differently from a real client. If graphics look like they are popping or re-drawing as you move, check it in the Roblox client on a published place before treating it as a bug. Replication timing, mobile input and mobile GPUs are also untestable in Play Solo; `Test > Clients and Servers` gets closer for replication only.
 - **Camera zoom is deliberately bounded** (8 to 36 studs), because Roblox's defaults let you sit inside your own avatar or pull back until the map is a dot. Flip `DevHooks:Invoke("freeCamera", true)` in a playtest if you need to inspect the whole map; players never get it.
 - **The biggest Chonk has to fit between the Vault display pads.** `Config.SizeScale`'s top value, `Config.WidestBodyProfile` and `Config.Vault.displaySpacing` are tied together by a test — if you make Chonks bigger or wider, that test tells you before the models start overlapping on the pads.

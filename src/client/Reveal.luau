@@ -15,6 +15,7 @@ local Format = require(ReplicatedStorage.Shared.Format)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local Strings = require(ReplicatedStorage.Shared.Strings)
 local Sfx = require(script.Parent.Sfx)
+local Ui = require(script.Parent.Ui)
 
 local Reveal = {}
 
@@ -168,6 +169,8 @@ function Reveal.start()
 	sheen.Color = ColorSequence.new(PANEL_TOP, PANEL)
 	sheen.Rotation = 90
 	sheen.Parent = card
+	Ui.rim(card, UDim.new(0, 24), 0.8)
+	local cardGlint = Ui.glint(card, UDim.new(0, 24), 7)
 	local scale = Instance.new("UIScale")
 	scale.Parent = card
 
@@ -191,6 +194,8 @@ function Reveal.start()
 		TextColor3 = INK,
 		ZIndex = 2,
 	})
+	tier.ZIndex = 3
+	Ui.gloss(band, UDim.new(0, 24), 0.5)
 
 	-- The portrait: a spotlight disc with the Chonk turning on it.
 	local spot = Instance.new("Frame")
@@ -263,11 +268,14 @@ function Reveal.start()
 	incomePlate.Parent = card
 	corner(incomePlate, UDim.new(0.5, 0))
 	stroke(incomePlate, GOLD, 2, 0.3)
+	Ui.rim(incomePlate, UDim.new(0.5, 0), 0.7)
+	Ui.gloss(incomePlate, UDim.new(0.5, 0), 0.2)
 	local income = text(incomePlate, "Income", {
 		Size = UDim2.fromScale(0.86, 0.72),
 		Position = UDim2.fromScale(0.07, 0.14),
 		TextColor3 = GOLD,
 	})
+	income.ZIndex = 3
 
 	local dismiss = text(card, "Dismiss", {
 		Size = UDim2.fromScale(0.9, 0.04),
@@ -356,6 +364,7 @@ function Reveal.start()
 		TweenService:Create(backdrop, TweenInfo.new(0.2), { BackgroundTransparency = 0.35 }):Play()
 		scale.Scale = 0.6
 		TweenService:Create(scale, TweenInfo.new(0.3, Enum.EasingStyle.Back), { Scale = 1 }):Play()
+		Ui.sweep(cardGlint)
 		-- The size stamp lands a beat after the card, like a rubber stamp.
 		stamp.TextTransparency = 1
 		stampEdge.Transparency = 1

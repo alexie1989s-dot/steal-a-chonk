@@ -1,6 +1,119 @@
 # Current handoff
 
-Updated: 2026-10-04 by Claude Code (heavy visual pass on top of sound, licensed props and UI polish; committed and pushed). The vertical-slice greybox prototype was built on 2026-09-24; the Showcase heist (Alpha step 1) was built on top of it on 2026-09-27; the presentation pass landed on 2026-09-29. The Codex art notes further down (2026-09-07) are history: art is paused during the prototype.
+Updated: 2026-10-05 by Claude Code (bigger uneven map, plan 2 tasks 0-5, and the glossy UI pass, both uncommitted on the local branch `polish/glossy-ui`; the heavy visual pass below it is committed and pushed as `b804444`). The vertical-slice greybox prototype was built on 2026-09-24; the Showcase heist (Alpha step 1) was built on top of it on 2026-09-27; the presentation pass landed on 2026-09-29. The Codex art notes further down (2026-09-07) are history: art is paused during the prototype.
+
+## 2026-10-05 Bigger, uneven map: plan 2, tasks 0 to 5 of 7 (Claude Code, not yet committed)
+
+Plan: `docs/superpowers/plans/2026-10-04-big-uneven-map.md`. The ledger is
+`.superpowers/sdd/2026-10-04-big-uneven-map/progress.md` (local), and its gate is `checks.sh <task>` in
+the same folder. The work sits uncommitted on `polish/glossy-ui`, on top of plan 1's uncommitted
+work. User ruling: the play surface stays flat (see `PROJECT_CONTEXT.md`).
+
+**Built:**
+
+| Area | Change |
+| --- | --- |
+| Shape | `Layout.outlineRadius`/`isInsideField`: an uneven edge, 378 to 479 from the centre. 12 nests at 150 to 330; 16 hedges |
+| Land | New pure `Ground` (flat inside the wall, a rim and a ridge past it, a pond in a hollow) and `LandGrid` (64-stud chunks, nearest first, filled to `LIFT = 2` under the surface; water filled to its waterline) |
+| Writer | New server `Landscape` writes Terrain at boot in the background (463 chunks in about 2.5 s), sets material colours and the water look, and removes any stale Baseplate. `Main` admits players only after the land is down (`LandReadyAt` ≤ `PlayersAdmittedAt`) |
+| World | The wall follows the outline in 144 segments, reaching 10 studs under the ground. Woods on the rim (128 trees, sunk 0.3 + 1.5 × slope). A fence across the pond's gap. No part domes and no green apron disc. The field scatter tries 460 candidates. `Config.Base.fieldOuterRadius` is gone |
+| Project | The Baseplate is removed from `default.project.json` |
+
+**Verified:**
+
+- **Headless:** `stylua`, `selene` and 104 Lune tests (14 new: 3 Layout, 4 Ground, 4 LandGrid, 3 Pond) all pass.
+- **Studio probes** (local, `.claude/tools/studio/`): all pass.
+  - `land_check`: the field sits within 0.016 of y = 0 and the hills average −0.13 off the formula.
+  - `world_check`: 144 walls, the worst 0.21 off the outline. Nothing in the field floats; rim trees are checked against the real terrain.
+  - `wall_walk`: the player stops 2 to 3 studs inside the wall at the nearest edge, the farthest edge and the pond.
+  - `pond_check`: the water lies at its waterline over a mud bed with a sand bank, and there is no water inside the wall.
+- **Part count:** 3606 against a baseline of 3143 (+14.7%), inside the plan's 15% budget. 3220 parts cast shadows, against 2803.
+
+**Not done:**
+
+- **Task 6, lighting and sky:** Future lighting, a 14.6 sun, the Atmosphere, a `Terrain` node with `Decoration`, `GrassLength` and `Clouds`, and removing the mesh clouds. It needs a rebuilt place and Studio reopened.
+- **Task 7:** these notes in full, and the README line at push time.
+- **The final whole-branch review.**
+
+**Seen and not fixed:** from the field, the far ridge renders as a huge wall of grey rock, because
+its slopes reach about 2 and are drawn as Rock. A softer ridge was proposed. The user declined that
+edit when parking, so ask before changing it. A capture of the pond view shows it; the next session can retake it with `views.luau`.
+
+**Studio:** it was closed (gone from the process list) at the end of the session, during a camera run.
+The cause is unknown. All `StudioMCP.exe` processes were then stopped, including the ones behind
+Claude Code's own Roblox Studio tools. Reconnect them (restart Claude Code, or `/mcp`) once Studio is
+open again.
+
+## 2026-10-04 Glossy UI pass (Claude Code, not yet committed)
+
+The user asked for glossy, glass-like round buttons that are "beautiful to press", and for
+everything to be polished to the maximum. This is plan 1 of 3:
+`docs/superpowers/plans/2026-10-04-glossy-ui.md`. Plan 2 (a bigger, uneven Terrain map and better
+lighting) and plan 3 (VFX, ambient life and a phone performance pass) are written next. The work
+sits uncommitted on the local branch `polish/glossy-ui`, because commits wait for the user.
+
+**Changed:**
+
+| Area | Change |
+| --- | --- |
+| Kit (`src/client/Ui.luau`) | New building blocks: a colour sheen, a wet-look gloss cap (narrower on round shapes so it stays inside the circle), a thin inner rim, a glint that sweeps a shape every few seconds, a glossy bubble chip and a glass panel. One RenderStepped loop drives every glint and drops the glints of destroyed GUIs. `Ui.button` is rebuilt as a glossy face on a deeper "lip" of its own colour. A press sinks the face onto the lip with a white flash; release springs it back. The moving parts live in a centre-anchored `Art` frame. What you press is a separate invisible `Hit` button that never moves, so a tap at the edge still lands while the face squashes. The press lets go when its input ends anywhere, so a thumb sliding off never leaves the face stuck down. `Ui.button` returns `Hit` |
+| HUD (`Hud.luau`) | The stat pills are glass with glossy icon bubbles, and the payout bump grows from the centre. Toasts are glass with a tone-coloured edge and a glossy tone bubble. Sibling layering |
+| Bat button (`Input.luau`, new `src/shared/TouchLayout.luau`) | A glossy round button: 96 px on tablets, 80 px on phones. It only exists on touch devices. It sits to the left of Roblox's own jump button and follows it when the screen changes. Both the old Bat and this pass's first position sat on top of the jump button: Roblox's current layout puts it at `(1,-136,1,-136)` (72 px) on phones and `(1,-220,1,-232)` (120 px) on tablets, read from the PlayerModule's TouchJump in Studio |
+| Prompts (`Prompts.luau`) | Glass plate, glossy gold key bubble, glossy orange hold bar and a slow glint |
+| Reveal card (`Reveal.luau`) | Glass rim, and a glint that sweeps as each card lands. Gloss on the tier band and the income pill. Nothing hazes the portrait |
+| World plates (`Models.luau`) | A faint glassy reflection on every name and unwrap plate. It fades with the plate |
+
+**Found and fixed during the on-screen check (the toast):**
+
+- **Dark toast text:** a UIGradient on a CanvasGroup tints everything inside the group, so the toast's words rendered dark.
+- **Edge that didn't fade:** a UIStroke on a CanvasGroup ignores the group's `GroupTransparency`, so the toast's edge stayed solid while the rest faded. The old toast had this problem too.
+- **The fix:** `Ui.glass` now builds a CanvasGroup's glass as an inset child fill that carries both the gradient and the outline, so everything fades as one.
+- **Same flaw in the pushed build:** `b804444`'s toast also had a UIGradient on its CanvasGroup, so its text is dark too. This is inferred from the code; it was not looked at on screen.
+
+**Fixed after the whole-change review:** a fresh reviewer found no Critical or Important issues.
+Three findings were raised to Important for their effect on touch players:
+
+- the gloss poking past a round button's edge
+- a press moving the tap area away from an edge tap, and a thumb sliding off leaving the face stuck down
+- the Bat covering the jump button
+
+All three are fixed, each with a test that failed first.
+
+**Verified:**
+
+- **Headless:** StyLua, `selene src` (0 errors), 90 Lune tests (4 new in `tests/TouchLayout.spec.luau`) and `rojo build` all pass.
+- **Studio probes (local, in `.claude/tools/studio/`):** `ui_kit_check`, `hud_check`, `prompt_check`, `reveal_check`, `plate_check` and `bat_place_check`. Each failed before its change and passes after.
+- **Press on the real HUD button:**
+  - Held: the tap area stays put while the art sinks.
+  - Dragged off and released: it springs back without clicking.
+  - A normal click still works.
+- **Glint leak:** 20 prompt show-and-hide cycles keep the glint count constant.
+- **Captures (real window):**
+  - the pills, and a toast arriving and fading
+  - the HUD forced to the phone scale (0.62)
+  - a test sheet of round and wide buttons in four colours, and a held press
+  - STEAL mid-hold
+  - Vault plates, near and far
+  - the reveal card landing
+
+**Not verified:**
+
+- **A real phone or tablet:** the Bat button only exists on touch. Its placement was checked against a stand-in jump button in Roblox's spots, and its press with mouse input.
+
+**Small things left as they are (from the review; not fixed in this pass):**
+
+- **Caption at phone scale:** at the 0.62 scale, the 11-px caption is about 7 px and "ZOOMIES" shows a kerning gap. Same caption size as before.
+- **Toast rim:** the rim sits on the tone-coloured edge rather than inside the glass.
+- **Button shadow:** the button's soft shadow is hidden under the lip's outline.
+- **Name-tag reflection:** on name tags the reflection is smaller than on unwrap plates, because the plate's padding lays it out.
+- **Nits:** `Ui.recolor` has no caller. The stat bar is 46 px but its pills are 48. World-label text draws over the reflection only because of child order.
+
+**Tooling: read this before capturing:**
+
+- **Capture recipe:** run `.claude/tools/studio/burst.ps1` in the background. It captures the viewport repeatedly and names each frame by its Unix-ms capture time. Then run a camera script that logs `DateTime.now().UnixTimestampMillis` marks, and use `pick.py` to take the frame nearest each mark.
+- **Studio must be open, not minimised.** The user keeps it behind their own windows. A minimised Studio draws nothing; `burst.ps1` says so and exits 2. Ask once per session, not repeatedly.
+- **Stage synchronously in `execute_luau`.** A thread scheduled to run after the script returns (a `task.delay`) is not reliable, and sometimes never fires.
+- **Session settings:** Studio's graphics quality was set to Level 21 and the window to full screen for the captures. Claude Code put both back at the end of the session (Automatic quality, the user's window size).
 
 ## 2026-10-04 Heavy visual pass: world text, cottages, wheel, clean-up (Claude Code)
 

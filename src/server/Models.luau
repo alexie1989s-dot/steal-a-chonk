@@ -692,7 +692,8 @@ local function label(name: string, studs: Vector2, pixels: Vector2, offsetY: num
 end
 Models.worldLabel = label
 
--- The plate every label sits on: dark, rounded, rimmed in an accent colour.
+-- The plate every label sits on: dark, rounded, rimmed in an accent colour, with a faint glassy
+-- reflection across its top like the HUD's panels.
 local function plate(parent: Instance, accent: Color3): Frame
 	local frame = Instance.new("Frame")
 	frame.Name = "Plate"
@@ -703,6 +704,19 @@ local function plate(parent: Instance, accent: Color3): Frame
 	frame.Parent = parent
 	round(frame, UDim.new(0.32, 0))
 	outline(frame, accent, 2.5, 0.05)
+	local shine = Instance.new("Frame")
+	shine.Name = "Gloss"
+	shine.AnchorPoint = Vector2.new(0.5, 0)
+	shine.Position = UDim2.fromScale(0.5, 0.06)
+	shine.Size = UDim2.fromScale(0.92, 0.44)
+	shine.BackgroundColor3 = Color3.new(1, 1, 1)
+	shine.BorderSizePixel = 0
+	shine.Parent = frame
+	round(shine, UDim.new(0.32, 0))
+	local fade = Instance.new("UIGradient")
+	fade.Rotation = 90
+	fade.Transparency = NumberSequence.new(0.84, 1)
+	fade.Parent = shine
 	return frame
 end
 

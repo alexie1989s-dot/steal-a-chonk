@@ -88,6 +88,30 @@ local suites: { { name: string, load: () -> () } } = {
 			require("./Sounds.spec")
 		end,
 	},
+	{
+		name = "TouchLayout",
+		load = function()
+			require("./TouchLayout.spec")
+		end,
+	},
+	{
+		name = "Ground",
+		load = function()
+			require("./Ground.spec")
+		end,
+	},
+	{
+		name = "LandGrid",
+		load = function()
+			require("./LandGrid.spec")
+		end,
+	},
+	{
+		name = "Pond",
+		load = function()
+			require("./Pond.spec")
+		end,
+	},
 }
 
 local loadFailures = {}

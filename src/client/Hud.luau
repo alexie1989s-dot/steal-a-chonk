@@ -13,8 +13,6 @@ local Ui = require(script.Parent.Ui)
 
 local Hud = {}
 
-local PANEL = Color3.fromRGB(34, 30, 46)
-local INK = Color3.fromRGB(18, 15, 28)
 local CASH = Color3.fromRGB(255, 214, 64)
 local ZOOM = Color3.fromRGB(120, 214, 255)
 local SPEED = Color3.fromRGB(162, 240, 150)
@@ -31,117 +29,88 @@ local TONES = {
 local SOUND_ON = utf8.char(0x1F50A)
 local SOUND_OFF = utf8.char(0x1F507)
 
-local function corner(parent: Instance, radius: number)
-	local c = Instance.new("UICorner")
-	c.CornerRadius = UDim.new(0, radius)
-	c.Parent = parent
-end
-
-local function stroke(parent: Instance, color: Color3, thickness: number, transparency: number?)
-	local s = Instance.new("UIStroke")
-	s.Color = color
-	s.Thickness = thickness
-	s.Transparency = transparency or 0
-	s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-	s.Parent = parent
-	return s
-end
-
--- A stat pill: a coloured chip, a caption and a value, on a panel with a soft drop shadow.
+-- A stat pill: a glossy icon bubble, a caption and a value on a glass panel with a soft shadow.
 type Pill = { value: TextLabel, pop: (Color3) -> () }
 
 local function pill(parent: Instance, order: number, caption: string, tint: Color3, glyph: string): Pill
 	local holder = Instance.new("Frame")
 	holder.Name = caption
 	holder.LayoutOrder = order
-	holder.Size = UDim2.fromOffset(176, 46)
+	holder.Size = UDim2.fromOffset(176, 48)
 	holder.BackgroundTransparency = 1
 	holder.Parent = parent
 
-	-- Drop shadow: a second panel sat just behind and below the real one.
 	local shadow = Instance.new("Frame")
 	shadow.Name = "Shadow"
 	shadow.Size = UDim2.fromScale(1, 1)
-	shadow.Position = UDim2.fromOffset(0, 3)
-	shadow.BackgroundColor3 = INK
-	shadow.BackgroundTransparency = 0.55
+	shadow.Position = UDim2.fromOffset(0, 4)
+	shadow.BackgroundColor3 = Ui.INK
+	shadow.BackgroundTransparency = 0.6
 	shadow.BorderSizePixel = 0
 	shadow.ZIndex = 1
 	shadow.Parent = holder
-	corner(shadow, 23)
+	Ui.corner(shadow, UDim.new(0.5, 0))
 
+	-- Anchored on its centre, so the payout bump grows evenly rather than to the lower right.
 	local body = Instance.new("Frame")
 	body.Name = "Body"
+	body.AnchorPoint = Vector2.new(0.5, 0.5)
+	body.Position = UDim2.fromScale(0.5, 0.5)
 	body.Size = UDim2.fromScale(1, 1)
-	body.BackgroundColor3 = PANEL
-	body.BackgroundTransparency = 0.08
-	body.BorderSizePixel = 0
 	body.ZIndex = 2
 	body.Parent = holder
-	corner(body, 23)
-	stroke(body, INK, 2, 0.25)
-	local gradient = Instance.new("UIGradient")
-	gradient.Color = ColorSequence.new(Color3.fromRGB(62, 56, 82), PANEL)
-	gradient.Rotation = 90
-	gradient.Parent = body
+	Ui.glass(body, UDim.new(0.5, 0))
 
-	local chip = Instance.new("Frame")
-	chip.Name = "Chip"
+	local chip = Ui.bubble(body, tint, 4)
 	chip.AnchorPoint = Vector2.new(0, 0.5)
-	chip.Position = UDim2.new(0, 7, 0.5, 0)
-	chip.Size = UDim2.fromOffset(32, 32)
-	chip.BackgroundColor3 = tint
-	chip.BorderSizePixel = 0
-	chip.ZIndex = 3
-	chip.Parent = body
-	corner(chip, 16)
-	stroke(chip, INK, 2, 0.4)
+	chip.Position = UDim2.new(0, 6, 0.5, 0)
+	chip.Size = UDim2.fromOffset(36, 36)
 	local icon = Instance.new("TextLabel")
 	icon.Name = "Icon"
 	icon.AnchorPoint = Vector2.new(0.5, 0.5)
-	icon.Position = UDim2.fromScale(0.5, 0.5)
-	icon.Size = UDim2.fromScale(0.72, 0.72)
+	icon.Position = UDim2.fromScale(0.5, 0.52)
+	icon.Size = UDim2.fromScale(0.68, 0.68)
 	icon.BackgroundTransparency = 1
 	icon.Font = Enum.Font.FredokaOne
 	icon.Text = glyph
 	icon.TextScaled = true
-	icon.ZIndex = 4
+	icon.ZIndex = 6
 	icon.Parent = chip
 
 	local label = Instance.new("TextLabel")
 	label.Name = "Caption"
-	label.AnchorPoint = Vector2.new(0, 0)
-	label.Position = UDim2.fromOffset(46, 5)
-	label.Size = UDim2.new(1, -54, 0, 14)
+	label.Position = UDim2.fromOffset(50, 6)
+	label.Size = UDim2.new(1, -60, 0, 13)
 	label.BackgroundTransparency = 1
 	label.Font = Enum.Font.GothamBold
 	label.Text = string.upper(caption)
 	label.TextSize = 11
 	label.TextXAlignment = Enum.TextXAlignment.Left
-	label.TextColor3 = Color3.fromRGB(184, 176, 206)
-	label.ZIndex = 3
+	label.TextColor3 = Color3.fromRGB(196, 190, 222)
+	label.ZIndex = 4
 	label.Parent = body
 
 	local value = Instance.new("TextLabel")
 	value.Name = "Value"
 	value.AnchorPoint = Vector2.new(0, 1)
-	value.Position = UDim2.new(0, 46, 1, -4)
-	value.Size = UDim2.new(1, -54, 0, 24)
+	value.Position = UDim2.new(0, 50, 1, -5)
+	value.Size = UDim2.new(1, -60, 0, 24)
 	value.BackgroundTransparency = 1
 	value.Font = Enum.Font.FredokaOne
 	value.Text = "0"
 	value.TextScaled = true
 	value.TextXAlignment = Enum.TextXAlignment.Left
 	value.TextColor3 = Color3.new(1, 1, 1)
-	value.ZIndex = 3
+	value.ZIndex = 4
 	value.Parent = body
+	Ui.stroke(value, Ui.INK, 1.5).ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
 
 	-- A short flash and bump, so a payout is felt rather than just read.
 	local function pop(flash: Color3)
 		value.TextColor3 = flash
-		body.Size = UDim2.fromScale(1.06, 1.06)
+		body.Size = UDim2.fromScale(1.08, 1.08)
 		TweenService:Create(value, TweenInfo.new(0.45), { TextColor3 = Color3.new(1, 1, 1) }):Play()
-		TweenService:Create(body, TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+		TweenService:Create(body, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
 			Size = UDim2.fromScale(1, 1),
 		}):Play()
 	end
@@ -179,6 +148,7 @@ function Hud.start()
 	gui.Name = "Hud"
 	gui.ResetOnSpawn = false
 	gui.IgnoreGuiInset = false
+	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	gui.Parent = player:WaitForChild("PlayerGui")
 
 	local bar = Instance.new("Frame")
@@ -297,37 +267,27 @@ function Hud.start()
 		holder.BackgroundTransparency = 1
 		holder.Parent = stack
 
-		-- A CanvasGroup so the whole toast fades as one, outline and icon included.
+		-- A CanvasGroup so the whole toast fades as one: glass, rim, bubble and text together.
 		local body = Instance.new("CanvasGroup")
 		body.Name = "Body"
 		body.Size = UDim2.fromScale(1, 1)
-		body.BackgroundColor3 = PANEL
-		body.BorderSizePixel = 0
 		body.Parent = holder
-		corner(body, 14)
-		stroke(body, look.color, 3, 0)
-		local sheen = Instance.new("UIGradient")
-		sheen.Color = ColorSequence.new(Color3.fromRGB(62, 56, 82), PANEL)
-		sheen.Rotation = 90
-		sheen.Parent = body
+		Ui.glass(body, UDim.new(0, 16), look.color)
 
-		local chip = Instance.new("Frame")
+		local chip = Ui.bubble(body, look.color, 3)
 		chip.Name = "Chip"
 		chip.AnchorPoint = Vector2.new(0, 0.5)
 		chip.Position = UDim2.new(0, 7, 0.5, 0)
-		chip.Size = UDim2.fromOffset(TOAST_HEIGHT - 14, TOAST_HEIGHT - 14)
-		chip.BackgroundColor3 = look.color
-		chip.BorderSizePixel = 0
-		chip.Parent = body
-		corner(chip, (TOAST_HEIGHT - 14) // 2)
+		chip.Size = UDim2.fromOffset(TOAST_HEIGHT - 12, TOAST_HEIGHT - 12)
 		local icon = Instance.new("TextLabel")
-		icon.Size = UDim2.fromScale(0.78, 0.78)
+		icon.Size = UDim2.fromScale(0.74, 0.74)
 		icon.AnchorPoint = Vector2.new(0.5, 0.5)
-		icon.Position = UDim2.fromScale(0.5, 0.5)
+		icon.Position = UDim2.fromScale(0.5, 0.52)
 		icon.BackgroundTransparency = 1
 		icon.Text = look.icon
 		icon.TextScaled = true
 		icon.Font = Enum.Font.FredokaOne
+		icon.ZIndex = 5
 		icon.Parent = chip
 
 		local label = Instance.new("TextLabel")
@@ -341,6 +301,7 @@ function Hud.start()
 		label.TextWrapped = true
 		label.TextXAlignment = Enum.TextXAlignment.Left
 		label.TextColor3 = Color3.new(1, 1, 1)
+		label.ZIndex = 3
 		label.Parent = body
 		local cap = Instance.new("UITextSizeConstraint")
 		cap.MaxTextSize = 22

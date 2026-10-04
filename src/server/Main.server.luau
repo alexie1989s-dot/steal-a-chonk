@@ -4,6 +4,7 @@ local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local Version = require(ReplicatedStorage.Shared.Version)
 local Server = script.Parent
 
+local Landscape = require(Server.Landscape)
 local Props = require(Server.Props)
 local World = require(Server.World)
 local DevHooks = require(Server.DevHooks)
@@ -21,6 +22,16 @@ local DummyBase = require(Server.DummyBase)
 local Bat = require(Server.Bat)
 
 Remotes.createAll()
+-- The land is written in the background while the scenery packs download, nearest the district
+-- first. Nobody is let in until all of it is down (below).
+local landReady = false
+task.spawn(function()
+	local ok, err = pcall(Landscape.build)
+	if not ok then
+		warn(`[Landscape] the land was not written: {err}`)
+	end
+	landReady = true
+end)
 -- The licensed scenery packs first: World uses them where they arrived (Props).
 Props.load()
 local world = World.build()
@@ -43,6 +54,10 @@ end)
 DevActions.start()
 DevHooks.start()
 
+while not landReady do
+	task.wait()
+end
+workspace:SetAttribute("PlayersAdmittedAt", os.clock())
 PlayerState.start()
 
 print(`[{Version.name}] server booted ({Version.stage})`)

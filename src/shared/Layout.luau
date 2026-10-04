@@ -28,6 +28,22 @@ function Layout.clampOutsideCurb(x: number, z: number, margin: number): (number,
 	return x / d * ring, z / d * ring
 end
 
+-- The field's edge: how far the boundary wall stands from the centre at a bearing (radians, as
+-- math.atan2(z, x) gives it). A circle bent by Config.Map.outline's harmonics.
+function Layout.outlineRadius(angle: number): number
+	local outline = Config.Map.outline
+	local f = 1
+	for _, h in outline.harmonics do
+		f += h.amplitude * math.sin(h.k * angle + h.phase)
+	end
+	return outline.mean * f
+end
+
+-- True when (x, z) is at least `margin` studs inside the field's edge, measured along the radius.
+function Layout.isInsideField(x: number, z: number, margin: number): boolean
+	return Layout.planarDistance(0, 0, x, z) <= Layout.outlineRadius(math.atan2(z, x)) - margin
+end
+
 -- Plot centres on a ring; yaw is the outward direction's angle (cos yaw, sin yaw) on the ground plane.
 function Layout.plotFrames(): { { x: number, z: number, yaw: number } }
 	local base = Config.Base
@@ -62,14 +78,15 @@ function Layout.obstaclePositions(): { { x: number, z: number } }
 	local base = Config.Base
 	local nests = Layout.nestPositions()
 	local clearance = Config.Guardian.patrolRadius + 6
-	local inner, outer = base.curbRadius + 20, base.fieldOuterRadius - 20
+	local inner = base.curbRadius + 20
 	local obstacles = {}
 	local candidate = 0
 	while #obstacles < base.obstacleCount and candidate < 1000 do
 		candidate += 1
+		local angle = candidate * GOLDEN_ANGLE + GOLDEN_ANGLE / 2
+		local outer = Layout.outlineRadius(angle) - 20
 		local t = (candidate % 7 + 0.5) / 7
 		local r = inner + t * (outer - inner)
-		local angle = candidate * GOLDEN_ANGLE + GOLDEN_ANGLE / 2
 		local x, z = r * math.cos(angle), r * math.sin(angle)
 		local clear = true
 		for _, n in nests do

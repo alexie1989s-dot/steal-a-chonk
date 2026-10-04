@@ -10,6 +10,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local Ground = require(ReplicatedStorage.Shared.Ground)
 local Layout = require(ReplicatedStorage.Shared.Layout)
 local Strings = require(ReplicatedStorage.Shared.Strings)
 local Models = require(script.Parent.Models)
@@ -20,6 +21,13 @@ local World = {}
 local CURB_SEGMENTS = 64
 local GOLDEN_ANGLE = math.pi * (3 - math.sqrt(5))
 local SCATTER_SEED = 20260929
+-- The boundary wall: one segment per 2.5 degrees of the outline, reaching WALL_SINK under the ground.
+local WALL_SEGMENTS = 144
+local WALL_SINK = 10
+-- Trees planted on the rim, and candidates tried for the field's scatter. The field is about twice
+-- the area it was; the scatter grows by less than that, to keep the part count in hand.
+local RIM_TREES = 170
+local DRESSING = 460
 
 local GRASS_DARK = Color3.fromRGB(78, 128, 62)
 local LEAF = Color3.fromRGB(86, 158, 74)
@@ -31,10 +39,6 @@ local STONE = Color3.fromRGB(150, 150, 156)
 local PAVE = Color3.fromRGB(226, 188, 136)
 local PAVE_ALT = Color3.fromRGB(206, 162, 108)
 local PAVE_RING = Color3.fromRGB(242, 212, 160)
--- The boundary hills keep their own greens. GRASS_DARK was too dark for a face this big: the side
--- turned away from the sun went almost black and the rim read as a wall rather than as hills.
-local HILL = Color3.fromRGB(136, 190, 108)
-local RIDGE = Color3.fromRGB(120, 166, 124)
 local WALL_HEIGHT = 70
 local CURB_YELLOW = Color3.fromRGB(255, 214, 64)
 local CURB_DARK = Color3.fromRGB(64, 58, 78)
@@ -401,106 +405,88 @@ end
 
 export type WorldInfo = { nests: { Vector3 }, curbRadius: number }
 
--- The field edge. Without this the map ran out into an open plain with a hard horizon line, which
--- reads as "the level stopped here". A ring of wooded hills closes it off.
+-- The field's edge. Past the wall the land itself rises into hills (Ground: the rim, then the
+-- ridge), so the field reads as a valley rather than as "the level stopped here".
 --
--- One invisible wall does all of the containing, and every visible piece stays CanCollide false,
--- so the hills can overlap the boundary freely without a player ever being wedged between two of
--- them, and a prompt raycast can never catch the wall.
+-- One invisible wall along the outline does all of the containing. Every visible piece stays
+-- CanCollide false, so nothing can wedge a player, and the wall is invisible to every raycast.
 local function boundary(root: Instance, rng: Random)
-	local base = Config.Base
-	local wall = base.fieldOuterRadius + 4
 	local fence = Instance.new("Folder")
 	fence.Name = "Boundary"
 	fence.Parent = root
 
-	local segments = 72
-	local segmentLength = 2 * math.pi * wall / segments + 2
-	for i = 1, segments do
-		local angle = 2 * math.pi * (i - 0.5) / segments
-		local position = Vector3.new(wall * math.cos(angle), WALL_HEIGHT / 2, wall * math.sin(angle))
-		local tangent = Vector3.new(-math.sin(angle), 0, math.cos(angle))
+	local function edge(angle: number): Vector3
+		local r = Layout.outlineRadius(angle)
+		return Vector3.new(r * math.cos(angle), 0, r * math.sin(angle))
+	end
+	for i = 1, WALL_SEGMENTS do
+		local a = edge(2 * math.pi * (i - 1) / WALL_SEGMENTS)
+		local b = edge(2 * math.pi * i / WALL_SEGMENTS)
+		local middle = (a + b) / 2 + Vector3.new(0, WALL_HEIGHT / 2 - WALL_SINK, 0)
 		Models.part({
 			Name = "FieldWall",
-			Size = Vector3.new(4, WALL_HEIGHT, segmentLength),
-			CFrame = CFrame.lookAt(position, position + tangent),
+			Size = Vector3.new(4, WALL_HEIGHT, (b - a).Magnitude + 2),
+			CFrame = CFrame.lookAt(middle, middle + (b - a)),
 			Transparency = 1,
 			CanQuery = false, -- solid to a player, invisible to every raycast
 			Parent = fence,
 		})
 	end
 
-	-- A dome half buried in the ground: `height` is how far it stands above the grass, `width` how
-	-- far it spreads. Returns the surface height at a given distance from its centre, so trees can
-	-- be planted up the slope instead of floating or sinking into it.
-	local function hill(centreRadius: number, angle: number, width: number, height: number, color: Color3)
-		local x, z = centreRadius * math.cos(angle), centreRadius * math.sin(angle)
-		prop({
-			Name = "Hill",
-			Shape = Enum.PartType.Ball,
-			Size = Vector3.new(width, height * 2, width * (0.78 + rng:NextNumber() * 0.3)),
-			CFrame = CFrame.new(x, 0, z) * CFrame.Angles(0, rng:NextNumber() * 6, 0),
-			Color = color,
-			Material = Enum.Material.Grass,
-			-- Overlapping domes this size threw hard black pockets onto each other, which read as
-			-- holes in the landscape. They are lit by the sun and the sky, and cast nothing.
-			CastShadow = false,
-			Parent = fence,
-		})
-		-- Surface height at a planar distance from the hill's centre. Measured against the dome's
-		-- narrower axis, so anything planted on it sinks slightly rather than floating.
-		return function(distance: number): number
-			local t = math.clamp(distance / (width * 0.39), 0, 1)
-			return height * math.sqrt(math.max(1 - t * t, 0))
-		end,
-			x,
-			z
-	end
-
-	-- The near rim: each hill is pushed out far enough that its foot lands just outside the wall,
-	-- so a player running at the boundary stops where the ground starts to rise.
-	local rimCount = 44
-	for i = 1, rimCount do
-		local angle = 2 * math.pi * (i - 0.5) / rimCount + (rng:NextNumber() - 0.5) * 0.04
-		local width = 132 + rng:NextNumber() * 54
-		local height = 30 + rng:NextNumber() * 16
-		local centreRadius = wall + width / 2 + 4
-		local surfaceAt, hx, hz =
-			hill(centreRadius, angle, width, height, Models.shade(HILL, (rng:NextNumber() - 0.45) * 0.16))
-		-- Trees up the slope and along the foot, so the rim reads as woods rather than as a berm.
-		for _ = 1, rng:NextInteger(2, 4) do
-			local r = centreRadius + (rng:NextNumber() - 0.35) * width * 0.6
-			local treeAngle = angle + (rng:NextNumber() - 0.5) * 0.08
-			local tx, tz = r * math.cos(treeAngle), r * math.sin(treeAngle)
-			tree(
-				Vector3.new(tx, surfaceAt(Layout.planarDistance(tx, tz, hx, hz)) - 1.5, tz),
-				1 + rng:NextNumber() * 0.6,
-				rng,
-				fence,
-				WOODS
-			)
+	-- Woods up the rim's near slope and over its crest, so it reads as wooded hills rather than a
+	-- bank. Never on a rock face, and never in the pond's hollow.
+	local water = Ground.pond()
+	for i = 1, RIM_TREES do
+		local angle = 2 * math.pi * (i - 0.5) / RIM_TREES + (rng:NextNumber() - 0.5) * 0.02
+		local r = Layout.outlineRadius(angle) + 8 + rng:NextNumber() * 92
+		local x, z = r * math.cos(angle), r * math.sin(angle)
+		local slope = Ground.slope(x, z)
+		local dry = not water
+			or Layout.planarDistance(x, z, water.x, water.z) > water.radius + Config.Map.pond.shore + 6
+		if slope < 0.6 and dry then
+			-- Sunk a little extra, and more on a slope, so no trunk shows daylight: Roblox draws
+			-- crests and hollows up to half a stud below Ground.height (measured 2026-10-05).
+			local ground = Ground.height(x, z) - 0.3 - 1.5 * slope
+			tree(Vector3.new(x, ground, z), 1 + rng:NextNumber() * 0.6, rng, fence, WOODS)
 		end
 	end
 
-	-- The far ridge: taller, cooler and bluer, so it reads as distance. This is what closes the
-	-- horizon once the camera lifts above the near rim.
-	-- One radius for the whole band, so the hills always overlap. Letting it vary left gaps you
-	-- could see the open horizon through from a raised camera.
-	local ridgeCount = 48
-	local ridgeRadius = wall + 190
-	for i = 1, ridgeCount do
-		local angle = 2 * math.pi * (i - 0.5) / ridgeCount + (rng:NextNumber() - 0.5) * 0.05
-		hill(
-			ridgeRadius,
-			angle,
-			230 + rng:NextNumber() * 70,
-			118 + rng:NextNumber() * 40,
-			RIDGE:Lerp(Color3.new(0.58, 0.7, 0.8), 0.18 + rng:NextNumber() * 0.22)
-		)
+	-- A low wooden fence along the wall where the rim dips for the pond, so the open view reads as
+	-- the field's edge rather than a way out. Scenery: the invisible wall does the stopping.
+	local spec = Config.Map.pond
+	if spec then
+		local posts, half = 22, spec.gapHalfAngle * 0.85
+		local previous: Vector3? = nil
+		for i = 0, posts do
+			local angle = spec.angle - half + 2 * half * i / posts
+			local r = Layout.outlineRadius(angle) - 3
+			local at = Vector3.new(r * math.cos(angle), 0, r * math.sin(angle))
+			prop({
+				Name = "FencePost",
+				Size = Vector3.new(0.8, 3.6, 0.8),
+				CFrame = CFrame.new(at + Vector3.new(0, 1.8, 0)),
+				Color = BARK,
+				Material = Enum.Material.Wood,
+				Parent = fence,
+			})
+			if previous then
+				for _, y in { 1.4, 2.8 } do
+					local a, b = previous + Vector3.new(0, y, 0), at + Vector3.new(0, y, 0)
+					prop({
+						Name = "FenceRail",
+						Size = Vector3.new(0.4, 0.4, (b - a).Magnitude + 0.6),
+						CFrame = CFrame.lookAt((a + b) / 2, b),
+						Color = Color3.fromRGB(150, 112, 78),
+						Material = Enum.Material.Wood,
+						Parent = fence,
+					})
+				end
+			end
+			previous = at
+		end
 	end
 
-	-- The whole boundary sits 350 to 520 studs out, past the shadow map's useful range, so nothing
-	-- in it casts. That is 684 parts taken out of the shadow pass for no visible change.
+	-- The whole boundary sits past the shadow map's useful range, so nothing in it casts.
 	for _, d in fence:GetDescendants() do
 		if d:IsA("BasePart") then
 			d.CastShadow = false
@@ -561,8 +547,8 @@ function World.build(): WorldInfo
 
 	local base = Config.Base
 
-	-- Paving in three concentric tones, so the district reads as laid rather than poured.
-	flatDisc("BaseApron", base.curbRadius + 10, 0.3, 0.12, Color3.fromRGB(108, 172, 80), root)
+	-- Paving in three concentric tones, so the district reads as laid rather than poured. The grass
+	-- round it is the Terrain's own (Landscape).
 	flatDisc("BaseDistrict", base.curbRadius, 0.4, 0.2, PAVE, root)
 	flatDisc("BaseRingOuter", base.curbRadius - 16, 0.42, 0.24, PAVE_RING, root)
 	flatDisc("BaseRingInner", base.plotRingRadius - 24, 0.44, 0.28, PAVE_ALT, root)
@@ -675,12 +661,12 @@ function World.build(): WorldInfo
 	dressing.Parent = root
 	local nestPoints = Layout.nestPositions()
 	local clearance = Config.Guardian.patrolRadius + 10
-	local inner, outer = base.curbRadius + 14, base.fieldOuterRadius - 6
+	local inner = base.curbRadius + 14
 	local placed = 0
-	for candidate = 1, 320 do
-		local t = (candidate % 11 + 0.5) / 11
-		local r = inner + t * (outer - inner)
+	for candidate = 1, DRESSING do
 		local angle = candidate * GOLDEN_ANGLE
+		local t = (candidate % 11 + 0.5) / 11
+		local r = inner + t * (Layout.outlineRadius(angle) - 6 - inner)
 		local x, z = r * math.cos(angle), r * math.sin(angle)
 		local clear = true
 		for _, n in nestPoints do

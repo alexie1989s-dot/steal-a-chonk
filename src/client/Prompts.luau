@@ -37,6 +37,7 @@ local function show(prompt: ProximityPrompt, inputType: Enum.ProximityPromptInpu
 	board.AlwaysOnTop = true
 	board.ResetOnSpawn = false
 	board.Active = true
+	board.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	board.Size = UDim2.fromOffset(WIDTH, PLATE + CAPTION)
 	board.SizeOffset = Vector2.new(prompt.UIOffset.X / WIDTH, prompt.UIOffset.Y / (PLATE + CAPTION))
 	board.Adornee = prompt.Parent :: Instance
@@ -56,49 +57,39 @@ local function show(prompt: ProximityPrompt, inputType: Enum.ProximityPromptInpu
 		Ui.stroke(caption, Ui.INK, 2).ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
 	end
 
-	-- The plate is a button so a tap or click works the prompt too.
+	-- The plate is a button so a tap or click works the prompt too. Glass, like the HUD.
 	local plate = Instance.new("TextButton")
 	plate.Name = "Plate"
 	plate.Position = UDim2.fromOffset(0, CAPTION)
 	plate.Size = UDim2.new(1, 0, 0, PLATE)
-	plate.BackgroundColor3 = Ui.PANEL
-	plate.BorderSizePixel = 0
 	plate.AutoButtonColor = false
 	plate.Text = ""
 	plate.ClipsDescendants = true
+	plate.ZIndex = 1
 	plate.Parent = board
-	Ui.corner(plate, UDim.new(0.5, 0))
-	Ui.stroke(plate, Ui.INK, 3)
-	local sheen = Instance.new("UIGradient")
-	sheen.Color = ColorSequence.new(Color3.fromRGB(62, 56, 82), Ui.PANEL)
-	sheen.Rotation = 90
-	sheen.Parent = plate
+	Ui.glass(plate, UDim.new(0.5, 0))
 
+	-- The hold fill is a glossy bar of its own, under the plate's reflection.
 	local fill = Instance.new("Frame")
 	fill.Name = "Hold"
 	fill.Size = UDim2.fromScale(0, 1)
-	fill.BackgroundColor3 = HOLD_FILL
-	fill.BackgroundTransparency = 0.25
 	fill.BorderSizePixel = 0
+	fill.ZIndex = 1
 	fill.Parent = plate
 	Ui.corner(fill, UDim.new(0.5, 0))
+	Ui.sheen(fill, HOLD_FILL)
+	Ui.gloss(fill, UDim.new(0.5, 0), 0.45)
 
-	local chip = Instance.new("Frame")
+	local chip = Ui.bubble(plate, GOLD, 4)
 	chip.Name = "Key"
 	chip.AnchorPoint = Vector2.new(0, 0.5)
 	chip.Position = UDim2.new(0, 5, 0.5, 0)
 	chip.Size = UDim2.fromOffset(PLATE - 10, PLATE - 10)
-	chip.BackgroundColor3 = GOLD
-	chip.BorderSizePixel = 0
-	chip.ZIndex = 2
-	chip.Parent = plate
-	Ui.corner(chip, UDim.new(0.5, 0))
-	Ui.stroke(chip, Ui.INK, 2)
-	Ui.sheen(chip, GOLD)
 	local key = Ui.label(chip, keyText(prompt, inputType))
 	if inputType == Enum.ProximityPromptInputType.Touch then
 		key.Font = Enum.Font.FredokaOne
 	end
+	Ui.glint(plate, UDim.new(0.5, 0), 4.5)
 
 	-- Luckiest Guy's lower case is a set of small capitals that sit at odd heights ("PeDAL!"), so
 	-- the action is always set in capitals.

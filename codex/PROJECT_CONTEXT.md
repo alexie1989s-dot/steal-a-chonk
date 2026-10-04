@@ -1,6 +1,6 @@
 # Steal a Chonk: project context
 
-Onboarded 2026-09-06; current asset update 2026-09-07; vertical-slice prototype 2026-09-24; Showcase heist 2026-09-27; presentation pass 2026-09-29; Roblox-official assets and sound allowed 2026-10-04; art paused for the prototype 2026-09-25; repository public on GitHub since 2026-09-25. This is a source-based project summary, not a new game design proposal.
+Onboarded 2026-09-06; current asset update 2026-09-07; vertical-slice prototype 2026-09-24; Showcase heist 2026-09-27; presentation pass 2026-09-29; Roblox-official assets and sound allowed 2026-10-04; bigger flat map with an uneven edge 2026-10-04; art paused for the prototype 2026-09-25; repository public on GitHub since 2026-09-25. This is a source-based project summary, not a new game design proposal.
 
 ## Art paused during the prototype (2026-09-25)
 
@@ -41,6 +41,35 @@ What this does and does not settle:
 
 **Sound: settled 2026-10-04,** see the next section. (It was open here: audio cannot be
 part-crafted, so it needed a third-party-asset ruling.)
+
+## A bigger, uneven map with a flat play surface: 2026-10-04 (user ruling)
+
+The user asked for "a larger uneven map that is not a perfect circle". Shown a design with gentle
+slopes in the field, **the user ruled: "keep surface flat, else things will start floating, rest all
+is fine".** The plan is `docs/superpowers/plans/2026-10-04-big-uneven-map.md`.
+
+- **Flat where anyone plays.** Everything inside the boundary wall stays at y = 0: the district,
+  the field and the nests. The land rises only past the wall, where nothing is carried or dropped.
+- **Approved numbers (map proposals; tune freely):**
+  - An uneven field edge 378 to 479 studs from the centre, with a mean of 440. That is about twice
+    the old field.
+  - 12 nests, 150 to 330 studs out. Spec §7 allows 8 to 14.
+  - 16 hedges.
+  - Terrain hills past the wall: a rim 23 to 45 high and a far ridge further out.
+  - A small lake past the wall, seen through a dip in the rim, behind a fence.
+- **The accepted cost of the wider nest band.** A brand-new player with 0 Zoomies gets home on 15% of
+  grabs, against 46% before. With 30 Zoomies it is 81%, against 93%. From 100 Zoomies up it is 100%,
+  before and after. This was simulated with `GuardianBrain`.
+- **Terrain facts, measured in Studio:**
+  - Roblox draws a solid terrain surface 2 studs (half a voxel) above its filled height, so
+    `LandGrid` fills to `LIFT = 2` below `Ground.height`.
+  - Water has no such lift.
+  - Rock and Slate are drawn roughened.
+  - Smooth hills come out up to about half a stud below the formula at crests and hollows, so the
+    trees on them are sunk to match.
+- **Still open for the user:** the lighting choices (Future, a 14:36 sun, dynamic clouds,
+  animated grass) were proposed but not yet shown. A change to soften the grey-rock far ridge was
+  declined at the moment the session was parked (2026-10-05). Ask before changing the ridge.
 
 ## Roblox-official assets and sound: 2026-10-04 (user ruling)
 

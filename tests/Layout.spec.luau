@@ -59,13 +59,58 @@ T.test("obstacles: requested count, in the field, clear of nests", function()
 	T.expectEqual(#obstacles, Config.Base.obstacleCount)
 	for i, o in obstacles do
 		local d = Layout.planarDistance(0, 0, o.x, o.z)
-		T.expectTrue(d > Config.Base.curbRadius + 10 and d < Config.Base.fieldOuterRadius, "obstacle band " .. i)
+		T.expectTrue(
+			d > Config.Base.curbRadius + 10 and Layout.isInsideField(o.x, o.z, 20 - 1e-6),
+			"obstacle band " .. i
+		)
 		for _, n in Layout.nestPositions() do
 			T.expectTrue(
 				Layout.planarDistance(o.x, o.z, n.x, n.z) > Config.Guardian.patrolRadius + 6,
 				"obstacle near nest " .. i
 			)
 		end
+	end
+end)
+
+T.test("outline: an uneven ring with no jumps, the same every time", function()
+	local outline = Config.Map.outline
+	local reach = 0
+	for _, h in outline.harmonics do
+		reach += h.amplitude
+	end
+	local low, high = math.huge, 0
+	local previous = Layout.outlineRadius(0)
+	for i = 1, 3600 do
+		local r = Layout.outlineRadius(2 * math.pi * i / 3600)
+		low, high = math.min(low, r), math.max(high, r)
+		T.expectTrue(math.abs(r - previous) < 1, `jump at bearing step {i}`)
+		previous = r
+	end
+	T.expectTrue(low >= outline.mean * (1 - reach) - 1e-6, `pinched to {low}`)
+	T.expectTrue(high <= outline.mean * (1 + reach) + 1e-6, `bulges to {high}`)
+	T.expectTrue(high - low >= outline.mean * 0.1, `too round: {low}..{high}`)
+	T.expectEqual(Layout.outlineRadius(1.234), Layout.outlineRadius(1.234))
+end)
+
+T.test("isInsideField measures in from the edge along the radius", function()
+	local angle = 0.8
+	local edge = Layout.outlineRadius(angle)
+	local function at(r: number): (number, number)
+		return r * math.cos(angle), r * math.sin(angle)
+	end
+	T.expectTrue(Layout.isInsideField(0, 0, 10), "the centre")
+	local x, z = at(edge - 11)
+	T.expectTrue(Layout.isInsideField(x, z, 10), "11 in")
+	x, z = at(edge - 9)
+	T.expectTrue(not Layout.isInsideField(x, z, 10), "9 in")
+	x, z = at(edge + 1)
+	T.expectTrue(not Layout.isInsideField(x, z, 0), "past the edge")
+end)
+
+T.test("every nest and its Mama's patrol ring sit well inside the field", function()
+	local margin = Config.Guardian.patrolRadius + Config.Guardian.radius + 10
+	for i, n in Layout.nestPositions() do
+		T.expectTrue(Layout.isInsideField(n.x, n.z, margin), "nest " .. i)
 	end
 end)
 
